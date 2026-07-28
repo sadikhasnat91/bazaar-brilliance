@@ -187,9 +187,9 @@ export function Header() {
               <DropdownMenuItem asChild><Link to="/register">Register</Link></DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild><Link to="/account">Dashboard</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link to="/account?tab=orders">Orders</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link to="/account" search={{ tab: "orders" }}>Orders</Link></DropdownMenuItem>
               <DropdownMenuItem asChild><Link to="/wishlist">Wishlist</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link to="/account?tab=settings">Settings</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link to="/account" search={{ tab: "settings" }}>Settings</Link></DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild><Link to="/admin">Admin Panel</Link></DropdownMenuItem>
             </DropdownMenuContent>

@@ -16,7 +16,16 @@ function SearchPage() {
   const { q } = useSearch({ from: "/search" });
   const query = (q || "").toLowerCase();
   const results = query
-    ? products.filter((p) => p.title.toLowerCase().includes(query) || p.brand.toLowerCase().includes(query) || p.category.includes(query) || p.tags.some((t) => t.toLowerCase().includes(query)))
+    ? products.filter(
+        (p) =>
+          p.title.toLowerCase().includes(query) ||
+          p.brand.toLowerCase().includes(query) ||
+          p.category.toLowerCase().includes(query) ||
+          p.subcategory.toLowerCase().includes(query) ||
+          p.seller.toLowerCase().includes(query) ||
+          p.description.toLowerCase().includes(query) ||
+          p.tags.some((t) => t.toLowerCase().includes(query))
+      )
     : products;
 
   return (

@@ -56,13 +56,13 @@ function AdminPanel() {
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6">
-      <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
-        <aside className="rounded-2xl border bg-card p-4 h-fit sticky top-32">
-          <div className="mb-4 flex items-center gap-2 px-2">
-            <div className="grid h-8 w-8 place-items-center rounded-lg gradient-brand text-white text-sm font-black">A</div>
-            <p className="font-black">Admin</p>
-          </div>
-          <Tabs defaultValue="dashboard" orientation="vertical" className="w-full">
+      <Tabs defaultValue="dashboard" className="w-full">
+        <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
+          <aside className="rounded-2xl border bg-card p-4 h-fit sticky top-32">
+            <div className="mb-4 flex items-center gap-2 px-2">
+              <div className="grid h-8 w-8 place-items-center rounded-lg gradient-brand text-white text-sm font-black">A</div>
+              <p className="font-black">Admin</p>
+            </div>
             <TabsList className="flex-col h-auto w-full bg-transparent p-0 items-stretch">
               {nav.map((n) => (
                 <TabsTrigger key={n.v} value={n.v} className="justify-start gap-2 data-[state=active]:bg-muted">
@@ -70,13 +70,10 @@ function AdminPanel() {
                 </TabsTrigger>
               ))}
             </TabsList>
-            <div className="lg:hidden" />
-          </Tabs>
-          <Button variant="ghost" className="mt-4 w-full justify-start gap-2 text-muted-foreground"><LogOut className="h-4 w-4" /> Sign out</Button>
-        </aside>
+            <Button variant="ghost" className="mt-4 w-full justify-start gap-2 text-muted-foreground"><LogOut className="h-4 w-4" /> Sign out</Button>
+          </aside>
 
-        <div>
-          <Tabs defaultValue="dashboard">
+          <div>
             <TabsList className="lg:hidden mb-4 flex-wrap h-auto">
               {nav.map((n) => <TabsTrigger key={n.v} value={n.v}>{n.label}</TabsTrigger>)}
             </TabsList>
@@ -321,9 +318,9 @@ function AdminPanel() {
                 <Button>Save changes</Button>
               </div>
             </TabsContent>
-          </Tabs>
+          </div>
         </div>
-      </div>
+      </Tabs>
     </div>
   );
 }
