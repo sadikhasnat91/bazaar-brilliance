@@ -78,7 +78,7 @@ function CategoryPage() {
       <div>
         <p className="mb-2 font-semibold">Subcategory</p>
         <div className="space-y-2">
-          {category.subcategories.map((s) => (
+          {category.subcategories.map((s: string) => (
             <label key={s} className="flex items-center gap-2 text-sm">
               <Checkbox checked={selectedSubs.includes(s)} onCheckedChange={(v) => setSelectedSubs((cur) => v ? [...cur, s] : cur.filter((x) => x !== s))} />
               {s}

@@ -210,7 +210,7 @@ function ProductPage() {
                 {Object.entries(product.specs).map(([k, v]) => (
                   <div key={k} className="flex justify-between border-b pb-2">
                     <dt className="text-muted-foreground">{k}</dt>
-                    <dd className="font-medium">{v}</dd>
+                    <dd className="font-medium">{String(v)}</dd>
                   </div>
                 ))}
               </dl>
