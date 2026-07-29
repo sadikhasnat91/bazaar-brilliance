@@ -80,6 +80,30 @@ export async function initDb() {
     )
   `);
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS advertisements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      image_url TEXT NOT NULL,
+      link_url TEXT NOT NULL DEFAULT '#',
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS carousel_slides (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      image_url TEXT NOT NULL,
+      caption TEXT,
+      sub_caption TEXT,
+      target_url TEXT NOT NULL DEFAULT '#',
+      position INTEGER NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+
   // Seeding products
   const result = await db.execute("SELECT COUNT(*) as count FROM products");
   const count = result.rows[0].count as number;

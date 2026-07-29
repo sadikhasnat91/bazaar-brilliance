@@ -44,12 +44,13 @@ export const updateProductFn = createServerFn({ method: "POST" })
     await db.execute({
       sql: `UPDATE products SET
         title = ?, description = ?, price = ?, originalPrice = ?, discount = ?,
-        stock = ?, brand = ?, seller = ?, category = ?, subcategory = ?, badge = ?
+        image = ?, gallery = ?, stock = ?, brand = ?, seller = ?, category = ?,
+        subcategory = ?, specs = ?, badge = ?
         WHERE id = ?`,
       args: [
         data.title, data.description, data.price, data.originalPrice, data.discount,
-        data.stock, data.brand, data.seller, data.category, data.subcategory,
-        data.badge || null, data.id
+        data.image, JSON.stringify(data.gallery || []), data.stock, data.brand, data.seller,
+        data.category, data.subcategory, JSON.stringify(data.specs || {}), data.badge || null, data.id
       ]
     });
     return data;
@@ -195,3 +196,80 @@ export const getProductFn = createServerFn({ method: "GET" })
     return parseProductRow(res.rows[0]);
   });
 
+// --- Advertisements Server Functions ---
+
+export const getAdsFn = createServerFn({ method: "GET" })
+  .handler(async () => {
+    await ensureDb();
+    const res = await db.execute("SELECT * FROM advertisements ORDER BY id DESC");
+    return res.rows.map(r => ({ ...r, active: Boolean(r.active) })) as any[];
+  });
+
+export const addAdFn = createServerFn({ method: "POST" })
+  .validator((data: { title: string; image_url: string; link_url: string; active: boolean }) => data)
+  .handler(async ({ data }) => {
+    await ensureDb();
+    await db.execute({
+      sql: "INSERT INTO advertisements (title, image_url, link_url, active) VALUES (?, ?, ?, ?)",
+      args: [data.title, data.image_url, data.link_url, data.active ? 1 : 0]
+    });
+    return data;
+  });
+
+export const updateAdFn = createServerFn({ method: "POST" })
+  .validator((data: { id: number; title: string; image_url: string; link_url: string; active: boolean }) => data)
+  .handler(async ({ data }) => {
+    await ensureDb();
+    await db.execute({
+      sql: "UPDATE advertisements SET title = ?, image_url = ?, link_url = ?, active = ? WHERE id = ?",
+      args: [data.title, data.image_url, data.link_url, data.active ? 1 : 0, data.id]
+    });
+    return data;
+  });
+
+export const deleteAdFn = createServerFn({ method: "POST" })
+  .validator((id: number) => id)
+  .handler(async ({ data: id }) => {
+    await ensureDb();
+    await db.execute({ sql: "DELETE FROM advertisements WHERE id = ?", args: [id] });
+    return { id };
+  });
+
+// --- Carousel Slides Server Functions ---
+
+export const getCarouselFn = createServerFn({ method: "GET" })
+  .handler(async () => {
+    await ensureDb();
+    const res = await db.execute("SELECT * FROM carousel_slides ORDER BY position ASC, id ASC");
+    return res.rows.map(r => ({ ...r, active: Boolean(r.active) })) as any[];
+  });
+
+export const addCarouselSlideFn = createServerFn({ method: "POST" })
+  .validator((data: { image_url: string; caption: string; sub_caption: string; target_url: string; position: number; active: boolean }) => data)
+  .handler(async ({ data }) => {
+    await ensureDb();
+    await db.execute({
+      sql: "INSERT INTO carousel_slides (image_url, caption, sub_caption, target_url, position, active) VALUES (?, ?, ?, ?, ?, ?)",
+      args: [data.image_url, data.caption, data.sub_caption, data.target_url, data.position, data.active ? 1 : 0]
+    });
+    return data;
+  });
+
+export const updateCarouselSlideFn = createServerFn({ method: "POST" })
+  .validator((data: { id: number; image_url: string; caption: string; sub_caption: string; target_url: string; position: number; active: boolean }) => data)
+  .handler(async ({ data }) => {
+    await ensureDb();
+    await db.execute({
+      sql: "UPDATE carousel_slides SET image_url = ?, caption = ?, sub_caption = ?, target_url = ?, position = ?, active = ? WHERE id = ?",
+      args: [data.image_url, data.caption, data.sub_caption, data.target_url, data.position, data.active ? 1 : 0, data.id]
+    });
+    return data;
+  });
+
+export const deleteCarouselSlideFn = createServerFn({ method: "POST" })
+  .validator((id: number) => id)
+  .handler(async ({ data: id }) => {
+    await ensureDb();
+    await db.execute({ sql: "DELETE FROM carousel_slides WHERE id = ?", args: [id] });
+    return { id };
+  });

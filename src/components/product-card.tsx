@@ -27,11 +27,11 @@ export function ProductCard({ product, className }: { product: Product; classNam
           <Heart className={cn("h-4 w-4", wished && "fill-destructive text-destructive")} />
         </button>
       </Link>
-      <div className="flex flex-1 flex-col gap-2 p-3">
-        <Link to="/product/$id" params={{ id: product.slug }} className="line-clamp-2 text-sm font-medium leading-snug hover:text-brand">
+      <div className="flex flex-1 flex-col gap-1.5 p-2.5">
+        <Link to="/product/$id" params={{ id: product.slug }} className="line-clamp-2 text-[13px] font-medium leading-snug hover:text-brand">
           {product.title}
         </Link>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
           <Star className="h-3.5 w-3.5 fill-warning text-warning" />
           <span className="font-medium text-foreground">{product.rating}</span>
           <span>({product.reviews.toLocaleString()})</span>

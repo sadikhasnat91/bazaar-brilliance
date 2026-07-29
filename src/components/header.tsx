@@ -86,7 +86,6 @@ export function Header() {
               <Link to="/account" className="rounded-lg px-3 py-2 text-sm hover:bg-muted">Dashboard</Link>
               <Link to="/wishlist" className="rounded-lg px-3 py-2 text-sm hover:bg-muted">Wishlist</Link>
               <Link to="/track" className="rounded-lg px-3 py-2 text-sm hover:bg-muted">Track order</Link>
-              <Link to="/admin" className="rounded-lg px-3 py-2 text-sm hover:bg-muted">Admin panel</Link>
             </div>
           </SheetContent>
         </Sheet>
@@ -190,8 +189,6 @@ export function Header() {
               <DropdownMenuItem asChild><Link to="/account" search={{ tab: "orders" }}>Orders</Link></DropdownMenuItem>
               <DropdownMenuItem asChild><Link to="/wishlist">Wishlist</Link></DropdownMenuItem>
               <DropdownMenuItem asChild><Link to="/account" search={{ tab: "settings" }}>Settings</Link></DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild><Link to="/admin">Admin Panel</Link></DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

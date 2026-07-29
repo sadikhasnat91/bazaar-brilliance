@@ -1,13 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowRight, ChevronLeft, ChevronRight, Cpu, Shirt, Sofa, Sparkles, ShoppingBasket, Dumbbell, Baby, Car, Truck, Shield, Headphones, RefreshCw, Clock, Flame, Star } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Cpu, Shirt, Sofa, Sparkles, ShoppingBasket, Dumbbell, Baby, Car, Palette, Truck, Shield, Headphones, RefreshCw, Clock, Flame, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/product-card";
 import { categories, heroSlides, brandLogos, promoBanners, formatBDT } from "@/lib/data";
 import { useShop } from "@/lib/shop-context";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { getCarouselFn, getAdsFn } from "@/lib/products-api";
 
-const iconMap = { Cpu, Shirt, Sofa, Sparkles, ShoppingBasket, Dumbbell, Baby, Car } as const;
+const iconMap = { Cpu, Shirt, Sofa, Sparkles, ShoppingBasket, Dumbbell, Baby, Car, Palette } as const;
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -22,41 +24,45 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-function HeroCarousel() {
+function HeroCarousel({ slides }: { slides: any[] }) {
   const [i, setI] = useState(0);
+  useEffect(() => { setI(0); }, [slides.length]);
   useEffect(() => {
-    const t = setInterval(() => setI((x) => (x + 1) % heroSlides.length), 5500);
+    if (slides.length === 0) return;
+    const t = setInterval(() => setI((x) => (x + 1) % slides.length), 5500);
     return () => clearInterval(t);
-  }, []);
-  const s = heroSlides[i];
+  }, [slides.length]);
+  if (slides.length === 0) return null;
   return (
     <div className="relative overflow-hidden rounded-3xl shadow-card">
-      <div className="relative aspect-[16/8] sm:aspect-[16/6] lg:aspect-[16/5]">
-        {heroSlides.map((slide, idx) => (
+      <div className="relative w-full h-[250px] sm:h-[320px] md:h-[380px] lg:h-[420px]">
+        {slides.map((slide: any, idx: number) => (
           <div key={idx} className={cn("absolute inset-0 transition-opacity duration-700", idx === i ? "opacity-100" : "opacity-0")}>
-            <img src={slide.image} alt={slide.title} className="h-full w-full object-cover" />
+            <img src={slide.image_url || slide.image} alt={slide.caption || slide.title || "Slide"} className="h-full w-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-r from-primary/85 via-primary/50 to-transparent" />
             <div className="absolute inset-0 flex items-center">
               <div className="px-6 sm:px-12 max-w-xl text-white">
-                <span className="inline-block rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground animate-float-up">{slide.tag}</span>
-                <h2 className="mt-4 text-3xl sm:text-5xl lg:text-6xl font-black leading-tight animate-float-up">{slide.title}</h2>
-                <p className="mt-3 text-white/85 text-base sm:text-lg animate-float-up">{slide.subtitle}</p>
-                <Button asChild size="lg" className="mt-6 rounded-full bg-accent text-accent-foreground hover:bg-accent/90">
-                  <Link to={slide.href}>{slide.cta} <ArrowRight className="ml-2 h-4 w-4" /></Link>
-                </Button>
+                {(slide.tag) && <span className="inline-block rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground animate-float-up">{slide.tag}</span>}
+                <h2 className="mt-3 text-2xl sm:text-4xl lg:text-5xl font-black leading-tight animate-float-up">{slide.caption || slide.title}</h2>
+                {(slide.sub_caption || slide.subtitle) && <p className="mt-3 text-white/85 text-base sm:text-lg animate-float-up">{slide.sub_caption || slide.subtitle}</p>}
+                {(slide.target_url || slide.href) && (
+                  <Button asChild size="lg" className="mt-6 rounded-full bg-accent text-accent-foreground hover:bg-accent/90">
+                    <Link to={slide.target_url || slide.href}>{slide.cta || "Shop Now"} <ArrowRight className="ml-2 h-4 w-4" /></Link>
+                  </Button>
+                )}
               </div>
             </div>
           </div>
         ))}
       </div>
-      <button onClick={() => setI((x) => (x - 1 + heroSlides.length) % heroSlides.length)} className="absolute left-3 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center rounded-full bg-white/80 backdrop-blur hover:bg-white" aria-label="Previous">
+      <button onClick={() => setI((x) => (x - 1 + slides.length) % slides.length)} className="absolute left-3 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center rounded-full bg-white/80 backdrop-blur hover:bg-white" aria-label="Previous">
         <ChevronLeft className="h-5 w-5" />
       </button>
-      <button onClick={() => setI((x) => (x + 1) % heroSlides.length)} className="absolute right-3 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center rounded-full bg-white/80 backdrop-blur hover:bg-white" aria-label="Next">
+      <button onClick={() => setI((x) => (x + 1) % slides.length)} className="absolute right-3 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center rounded-full bg-white/80 backdrop-blur hover:bg-white" aria-label="Next">
         <ChevronRight className="h-5 w-5" />
       </button>
       <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1.5">
-        {heroSlides.map((_, idx) => (
+        {slides.map((_: any, idx: number) => (
           <button key={idx} onClick={() => setI(idx)} className={cn("h-1.5 rounded-full transition-all", idx === i ? "w-8 bg-white" : "w-1.5 bg-white/60")} aria-label={`Slide ${idx + 1}`} />
         ))}
       </div>
@@ -110,13 +116,21 @@ function Home() {
   const { recent, products } = useShop();
   const recentProducts = recent.map((id) => products.find((p) => p.id === id)).filter(Boolean).slice(0, 6);
   // Derive product sections dynamically from live DB-backed products
-  const flashSale = products.filter((p) => p.badge === "flash").slice(0, 5);
-  const newArrivals = products.filter((p) => p.badge === "new").slice(0, 5);
-  const featured = products.filter((p) => p.badge === "trending" || p.badge === "bestseller").slice(0, 10);
+  const flashSale = products.filter((p) => p.badge === "flash").slice(0, 6);
+  const newArrivals = products.filter((p) => p.badge === "new").slice(0, 6);
+  const featured = products.filter((p) => p.badge === "trending" || p.badge === "bestseller").slice(0, 12);
+
+  // Dynamic carousel & ads from admin panel
+  const { data: dbSlides = [] } = useQuery({ queryKey: ["carousel"], queryFn: () => getCarouselFn() });
+  const { data: dbAds = [] } = useQuery({ queryKey: ["ads"], queryFn: () => getAdsFn() });
+
+  const activeSlides = dbSlides.filter((s: any) => s.active);
+  const carouselSlides = activeSlides.length > 0 ? activeSlides : heroSlides;
+  const activeAds = dbAds.filter((a: any) => a.active);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 space-y-12">
-      <HeroCarousel />
+    <div className="mx-auto max-w-7xl px-4 py-6 space-y-6">
+      <HeroCarousel slides={carouselSlides} />
 
       {/* Trust bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -166,8 +180,8 @@ function Home() {
       >
         <div className="rounded-3xl gradient-accent p-1">
           <div className="rounded-[calc(theme(borderRadius.3xl)-4px)] bg-background p-4">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {flashSale.slice(0, 5).map((p) => <ProductCard key={p.id} product={p} />)}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+              {flashSale.slice(0, 6).map((p) => <ProductCard key={p.id} product={p} />)}
             </div>
           </div>
         </div>
@@ -189,28 +203,45 @@ function Home() {
 
       {/* Trending */}
       <Section title="Trending now" subtitle="Loved by shoppers this week" action={<Button variant="ghost" asChild><Link to="/category/$slug" params={{ slug: "electronics" }}>View all <ArrowRight className="ml-1 h-4 w-4" /></Link></Button>}>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {featured.slice(0, 10).map((p) => <ProductCard key={p.id} product={p} />)}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+          {featured.slice(0, 12).map((p) => <ProductCard key={p.id} product={p} />)}
         </div>
       </Section>
 
-      {/* Ad banner */}
-      <div className="relative overflow-hidden rounded-3xl gradient-hero p-8 sm:p-12 text-white">
-        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(circle at 20% 20%, white 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
-        <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold"><Flame className="h-3 w-3" /> Limited offer</span>
-            <h3 className="mt-3 text-3xl sm:text-4xl font-black">Get up to ৳2,000 off</h3>
-            <p className="mt-1 text-white/80">On your first order over ৳5,000. Use code <span className="rounded bg-white/20 px-2 py-0.5 font-mono">BAZAAR2K</span></p>
-          </div>
-          <Button size="lg" asChild className="rounded-full bg-accent text-accent-foreground hover:bg-accent/90"><Link to="/category/$slug" params={{ slug: "electronics" }}>Start shopping</Link></Button>
+      {/* Ad banners — dynamic from admin, fallback to static */}
+      {activeAds.length > 0 ? (
+        <div className={cn("grid gap-4", activeAds.length > 1 ? "md:grid-cols-2" : "")}>
+          {activeAds.map((ad: any) => (
+            <a key={ad.id} href={ad.link_url || "#"} target="_blank" rel="noreferrer" className="group relative overflow-hidden rounded-3xl block">
+              <img src={ad.image_url} alt={ad.title} className="w-full aspect-[3/1] object-cover transition-transform duration-500 group-hover:scale-105" onError={(e) => { e.currentTarget.src = `https://picsum.photos/seed/ad-${ad.id}/1200/400`; }} />
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/80 to-transparent" />
+              <div className="absolute inset-0 flex items-center px-8">
+                <div className="text-white">
+                  <p className="text-2xl font-black">{ad.title}</p>
+                  <p className="mt-1 text-white/80 text-sm">Tap to learn more →</p>
+                </div>
+              </div>
+            </a>
+          ))}
         </div>
-      </div>
+      ) : (
+        <div className="relative overflow-hidden rounded-3xl gradient-hero p-8 sm:p-12 text-white">
+          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(circle at 20% 20%, white 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
+          <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold"><Flame className="h-3 w-3" /> Limited offer</span>
+              <h3 className="mt-3 text-3xl sm:text-4xl font-black">Get up to ৳2,000 off</h3>
+              <p className="mt-1 text-white/80">On your first order over ৳5,000. Use code <span className="rounded bg-white/20 px-2 py-0.5 font-mono">BAZAAR2K</span></p>
+            </div>
+            <Button size="lg" asChild className="rounded-full bg-accent text-accent-foreground hover:bg-accent/90"><Link to="/category/$slug" params={{ slug: "electronics" }}>Start shopping</Link></Button>
+          </div>
+        </div>
+      )}
 
       {/* New arrivals */}
       <Section title="New arrivals" subtitle="Fresh drops just in">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {newArrivals.slice(0, 5).map((p) => <ProductCard key={p.id} product={p} />)}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+          {newArrivals.slice(0, 6).map((p) => <ProductCard key={p.id} product={p} />)}
         </div>
       </Section>
 
@@ -270,7 +301,7 @@ function Home() {
       {/* Recently viewed */}
       {recentProducts.length > 0 && (
         <Section title="Recently viewed">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {recentProducts.map((p) => p && <ProductCard key={p.id} product={p} />)}
           </div>
         </Section>

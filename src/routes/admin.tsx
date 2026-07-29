@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Package, ShoppingCart, Users, Tag, BarChart3, MessageSquare,
+  LayoutDashboard, Package, ShoppingCart, Users, User, Tag, BarChart3, MessageSquare,
   Settings, Star, TrendingUp, ArrowUp, ArrowDown, DollarSign, Boxes, ClipboardList,
   Bell, LogOut, Shield, Lock, Mail, Eye, EyeOff, KeyRound, Search, Plus, Trash2, Edit,
-  FileText, CheckCircle2, AlertCircle, Send, Printer, RefreshCw, X
+  FileText, CheckCircle2, AlertCircle, Send, Printer, RefreshCw, X, Image as ImageIcon,
+  SlidersHorizontal, ToggleLeft, ToggleRight, ExternalLink, GripVertical, ChevronUp, ChevronDown
 } from "lucide-react";
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, Legend } from "recharts";
 import { useEffect, useState } from "react";
@@ -23,7 +24,15 @@ import {
   addCouponFn,
   deleteCouponFn,
   getMessagesFn,
-  replyToMessageFn
+  replyToMessageFn,
+  getAdsFn,
+  addAdFn,
+  updateAdFn,
+  deleteAdFn,
+  getCarouselFn,
+  addCarouselSlideFn,
+  updateCarouselSlideFn,
+  deleteCarouselSlideFn
 } from "@/lib/products-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +62,52 @@ const revenueData = [
 ];
 const categoryData = categories.slice(0, 5).map((c, i) => ({ name: c.name, value: [32, 24, 18, 14, 12][i] }));
 const COLORS = ["#2563eb", "#f97316", "#22c55e", "#a855f7", "#eab308"];
+const MAX_GALLERY_IMAGES = 5;
+
+function percentChange(current: number, previous: number) {
+  if (previous === 0) return current > 0 ? 100 : 0;
+  return ((current - previous) / previous) * 100;
+}
+
+function buildMonthlyRevenueData(orders: Order[], months = 7) {
+  const now = new Date();
+  const monthFrames = Array.from({ length: months }, (_, idx) => {
+    const offset = months - idx - 1;
+    const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const key = `${date.getFullYear()}-${month}`;
+    const label = date.toLocaleDateString("en-US", { month: "short" });
+    return { key, label };
+  });
+
+  const buckets = new Map(
+    monthFrames.map(({ key, label }) => [key, { m: label, revenue: 0, orders: 0, customers: new Set<string>() }])
+  );
+
+  for (const order of orders) {
+    const parsedDate = new Date(order.date);
+    if (Number.isNaN(parsedDate.getTime())) continue;
+
+    const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+    const key = `${parsedDate.getFullYear()}-${month}`;
+    const bucket = buckets.get(key);
+    if (!bucket) continue;
+
+    bucket.revenue += Number(order.total) || 0;
+    bucket.orders += 1;
+    bucket.customers.add((order.email || order.customer || "").toLowerCase());
+  }
+
+  return monthFrames.map(({ key }) => {
+    const bucket = buckets.get(key)!;
+    return {
+      m: bucket.m,
+      revenue: bucket.revenue,
+      orders: bucket.orders,
+      customers: bucket.customers.size,
+    };
+  });
+}
 
 type Order = {
   id: string;
@@ -123,7 +178,7 @@ const initialMessages: CustomerMessage[] = [
 ];
 
 function AdminLoginGatekeeper({ onLogin }: { onLogin: () => void }) {
-  const [email, setEmail] = useState("");
+  const [adminId, setAdminId] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -135,17 +190,14 @@ function AdminLoginGatekeeper({ onLogin }: { onLogin: () => void }) {
     setLoading(true);
 
     setTimeout(() => {
-      const formattedEmail = email.toLowerCase().trim();
-      const isValidAdmin =
-        (formattedEmail === "admin@bazaar.com.bd" && password === "admin123") ||
-        (formattedEmail.includes("admin") && password.length >= 4) ||
-        (formattedEmail.length > 0 && password === "admin123");
+      const storedId = localStorage.getItem("bazaar_admin_id") || "admin";
+      const storedPass = localStorage.getItem("bazaar_admin_password") || "admin123";
 
-      if (isValidAdmin) {
+      if (adminId.trim() === storedId && password === storedPass) {
         toast.success("Authenticated as Administrator");
         onLogin();
       } else {
-        setError("Invalid email or password. Use admin@bazaar.com.bd and admin123");
+        setError("Invalid Admin ID or Password.");
         toast.error("Access denied — Invalid admin credentials");
       }
       setLoading(false);
@@ -160,7 +212,7 @@ function AdminLoginGatekeeper({ onLogin }: { onLogin: () => void }) {
             <Shield className="h-8 w-8" />
           </div>
           <h1 className="text-3xl font-black tracking-tight">Admin Portal</h1>
-          <p className="text-sm text-muted-foreground">Private area — Authentication required</p>
+          <p className="text-sm text-muted-foreground">Private area — Direct URL access only</p>
         </div>
 
         <form onSubmit={handleSubmit} className="rounded-3xl border bg-card p-8 shadow-card space-y-4">
@@ -171,15 +223,15 @@ function AdminLoginGatekeeper({ onLogin }: { onLogin: () => void }) {
           )}
 
           <div>
-            <Label className="text-xs font-semibold uppercase text-muted-foreground">Admin Email</Label>
+            <Label className="text-xs font-semibold uppercase text-muted-foreground">Admin ID</Label>
             <div className="relative mt-1">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                type="email"
+                type="text"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@bazaar.com.bd"
+                value={adminId}
+                onChange={(e) => setAdminId(e.target.value)}
+                placeholder="Enter Admin ID"
                 className="pl-9 h-11 rounded-xl"
               />
             </div>
@@ -194,7 +246,6 @@ function AdminLoginGatekeeper({ onLogin }: { onLogin: () => void }) {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
                 className="pl-9 pr-10 h-11 rounded-xl"
               />
               <button
@@ -205,14 +256,6 @@ function AdminLoginGatekeeper({ onLogin }: { onLogin: () => void }) {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-          </div>
-
-          <div className="rounded-xl border bg-muted/40 p-3 text-xs space-y-1">
-            <p className="font-semibold text-brand flex items-center gap-1">
-              <KeyRound className="h-3.5 w-3.5" /> Admin Credentials:
-            </p>
-            <p className="text-muted-foreground">Email: <span className="font-mono font-semibold text-foreground">admin@bazaar.com.bd</span></p>
-            <p className="text-muted-foreground">Password: <span className="font-mono font-semibold text-foreground">admin123</span></p>
           </div>
 
           <Button type="submit" size="lg" className="w-full rounded-xl font-bold" disabled={loading}>
@@ -233,7 +276,7 @@ function AdminPanel() {
 
   // Dynamic States
   const queryClient = useQueryClient();
-  
+
   // Products Query/Mutations
   const { data: productList = [], isLoading: isLoadingProducts } = useQuery({
     queryKey: ["products"],
@@ -244,7 +287,7 @@ function AdminPanel() {
     mutationFn: (data: Product) => addProductFn({ data }),
     onSuccess: () => queryClient.refetchQueries({ queryKey: ["products"] })
   });
-  
+
   const updateProductMut = useMutation({
     mutationFn: (data: Product) => updateProductFn({ data }),
     onSuccess: () => queryClient.refetchQueries({ queryKey: ["products"] })
@@ -311,11 +354,48 @@ function AdminPanel() {
     onSuccess: () => queryClient.refetchQueries({ queryKey: ["messages"] })
   });
 
+  // Advertisements Query/Mutations
+  const { data: adsList = [] } = useQuery({
+    queryKey: ["ads"],
+    queryFn: () => getAdsFn(),
+  });
+  const addAdMut = useMutation({
+    mutationFn: (data: any) => addAdFn({ data }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ["ads"] })
+  });
+  const updateAdMut = useMutation({
+    mutationFn: (data: any) => updateAdFn({ data }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ["ads"] })
+  });
+  const deleteAdMut = useMutation({
+    mutationFn: (id: number) => deleteAdFn({ data: id }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ["ads"] })
+  });
+
+  // Carousel Query/Mutations
+  const { data: slidesList = [] } = useQuery({
+    queryKey: ["carousel"],
+    queryFn: () => getCarouselFn(),
+  });
+  const addSlideMut = useMutation({
+    mutationFn: (data: any) => addCarouselSlideFn({ data }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ["carousel"] })
+  });
+  const updateSlideMut = useMutation({
+    mutationFn: (data: any) => updateCarouselSlideFn({ data }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ["carousel"] })
+  });
+  const deleteSlideMut = useMutation({
+    mutationFn: (id: number) => deleteCarouselSlideFn({ data: id }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ["carousel"] })
+  });
+
   const [prodSearch, setProdSearch] = useState("");
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [addProdDialogOpen, setAddProdDialogOpen] = useState(false);
   const [newProdForm, setNewProdForm] = useState({
-    title: "", price: "", stock: "", category: "electronics", subcategory: "Smartphones", brand: "Bazaar", description: ""
+    title: "", price: "", stock: "", category: "electronics", subcategory: "General", brand: "Bazaar", description: "",
+    image: "", gallery: ["", "", "", "", ""] as string[], warranty: "1 Year", specs: { Warranty: "1 Year" } as Record<string, string>
   });
 
   const [orderSearch, setOrderSearch] = useState("");
@@ -333,6 +413,19 @@ function AdminPanel() {
 
   const [replyingMessage, setReplyingMessage] = useState<CustomerMessage | null>(null);
   const [replyInputText, setReplyInputText] = useState("");
+
+  // Advertisements State
+  const [addAdDialogOpen, setAddAdDialogOpen] = useState(false);
+  const [editingAd, setEditingAd] = useState<any | null>(null);
+  const [newAdForm, setNewAdForm] = useState({ title: "", image_url: "", link_url: "#", active: true });
+
+  // Carousel Slides State
+  const [addSlideDialogOpen, setAddSlideDialogOpen] = useState(false);
+  const [editingSlide, setEditingSlide] = useState<any | null>(null);
+  const [newSlideForm, setNewSlideForm] = useState({ image_url: "", caption: "", sub_caption: "", target_url: "#", position: 0, active: true });
+
+  const [adminIdInput, setAdminIdInput] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("bazaar_admin_id") || "admin" : "admin"));
+  const [adminPassInput, setAdminPassInput] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("bazaar_admin_password") || "admin123" : "admin123"));
 
   const [storeSettings, setStoreSettings] = useState({
     storeName: "Bazaar Bangladesh",
@@ -362,16 +455,24 @@ function AdminPanel() {
     e.preventDefault();
     if (!newProdForm.title || !newProdForm.price) return;
     const newId = String(productList.length + 101).padStart(3, "0");
+    const galleryArr = newProdForm.gallery.map((s) => s.trim()).filter(Boolean);
+    const finalGallery = galleryArr.length > 0 ? galleryArr : [`https://picsum.photos/seed/newprod-${newId}-1/1000/1000`];
+
+    const finalSpecs: Record<string, string> = {
+      ...(newProdForm.specs || {}),
+      Warranty: newProdForm.warranty || "1 Year"
+    };
+
     const created: Product = {
       id: newId,
       slug: `${newProdForm.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${newId}`,
       title: newProdForm.title,
       description: newProdForm.description || "Premium product available on Bazaar Bangladesh.",
       price: Number(newProdForm.price) || 1000,
-      originalPrice: (Number(newProdForm.price) || 1000) * 1.2,
+      originalPrice: Math.round((Number(newProdForm.price) || 1000) * 1.2),
       discount: 15,
-      image: `https://picsum.photos/seed/newprod-${newId}/800/800`,
-      gallery: [`https://picsum.photos/seed/newprod-${newId}-1/1000/1000`],
+      image: newProdForm.image.trim() || `https://picsum.photos/seed/newprod-${newId}/800/800`,
+      gallery: finalGallery,
       rating: 5.0,
       reviews: 1,
       sold: 0,
@@ -381,13 +482,16 @@ function AdminPanel() {
       category: newProdForm.category,
       subcategory: newProdForm.subcategory,
       tags: ["new", "featured"],
-      specs: { Warranty: "1 Year" },
+      specs: finalSpecs,
       badge: "new"
     };
 
     await addProductMut.mutateAsync(created);
     setAddProdDialogOpen(false);
-    setNewProdForm({ title: "", price: "", stock: "", category: "electronics", subcategory: "Smartphones", brand: "Bazaar", description: "" });
+    setNewProdForm({
+      title: "", price: "", stock: "", category: "electronics", subcategory: "General", brand: "Bazaar", description: "",
+      image: "", gallery: ["", "", "", "", ""], warranty: "1 Year", specs: { Warranty: "1 Year" }
+    });
     toast.success(`Product "${created.title}" created successfully!`);
   };
 
@@ -405,7 +509,11 @@ function AdminPanel() {
       }
     }
 
-    const finalProduct = { ...editingProduct, specs: finalSpecs };
+    const cleanGallery = (Array.isArray(editingProduct.gallery) ? editingProduct.gallery : [])
+      .map((s) => String(s).trim())
+      .filter(Boolean);
+
+    const finalProduct = { ...editingProduct, specs: finalSpecs, gallery: cleanGallery };
     await updateProductMut.mutateAsync(finalProduct);
     setEditingProduct(null);
     toast.success(`Product "${editingProduct.title}" updated`);
@@ -538,6 +646,42 @@ function AdminPanel() {
     c.city.toLowerCase().includes(customerSearch.toLowerCase())
   );
 
+  const monthlyRevenueData = buildMonthlyRevenueData(orderList, 7);
+  const currentMonthStats = monthlyRevenueData.at(-1) ?? { revenue: 0, orders: 0, customers: 0 };
+  const previousMonthStats = monthlyRevenueData.at(-2) ?? { revenue: 0, orders: 0, customers: 0 };
+
+  const totalRevenue = orderList.reduce((acc, order) => acc + (Number(order.total) || 0), 0);
+  const totalOrders = orderList.length;
+  const uniqueOrderCustomers = new Set(orderList.map((o) => (o.email || o.customer || "").toLowerCase()).filter(Boolean)).size;
+  const totalCustomers = Math.max(customerList.length, uniqueOrderCustomers);
+  const activeProducts = productList.filter((p) => p.stock > 0).length;
+  const aov = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+  const revenueChange = percentChange(currentMonthStats.revenue, previousMonthStats.revenue);
+  const ordersChange = percentChange(currentMonthStats.orders, previousMonthStats.orders);
+  const customersChange = percentChange(currentMonthStats.customers, previousMonthStats.customers);
+  const activeProductsChange = percentChange(activeProducts, productList.length);
+
+  const categorySalesData = categories
+    .map((category) => ({
+      name: category.name,
+      value: productList
+        .filter((product) => product.category === category.slug)
+        .reduce((sum, product) => sum + (Number(product.sold) || 0), 0),
+    }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
+
+  const pieCategoryData =
+    categorySalesData.length > 0
+      ? categorySalesData
+      : categories.slice(0, 5).map((category) => ({ name: category.name, value: 1 }));
+
+  const topCustomers = [...customerList].sort((a, b) => b.spent - a.spent).slice(0, 4);
+  const deliveredOrders = orderList.filter((order) => order.status === "Delivered").length;
+  const deliveredRate = totalOrders > 0 ? (deliveredOrders / totalOrders) * 100 : 0;
+
   const nav = [
     { v: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { v: "products", label: "Products", icon: Package },
@@ -547,6 +691,8 @@ function AdminPanel() {
     { v: "analytics", label: "Analytics", icon: BarChart3 },
     { v: "reviews", label: "Reviews", icon: Star },
     { v: "messages", label: "Messages", icon: MessageSquare },
+    { v: "advertisements", label: "Advertisements", icon: ImageIcon },
+    { v: "carousel", label: "Carousel Slider", icon: SlidersHorizontal },
     { v: "settings", label: "Settings", icon: Settings },
   ];
 
@@ -593,16 +739,16 @@ function AdminPanel() {
 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[
-                  { label: "Total Revenue", value: formatBDT(orderList.reduce((acc, o) => acc + o.total, 940000)), change: 12.4, up: true, icon: DollarSign, color: "bg-brand/10 text-brand" },
-                  { label: "Total Orders", value: String(orderList.length + 715), change: 8.1, up: true, icon: ShoppingCart, color: "bg-accent/10 text-accent" },
-                  { label: "Total Customers", value: String(customerList.length * 2490), change: 5.6, up: true, icon: Users, color: "bg-success/10 text-success" },
-                  { label: "Active Products", value: String(productList.length), change: 2.3, up: true, icon: Boxes, color: "bg-warning/10 text-warning" },
+                  { label: "Total Revenue", value: formatBDT(totalRevenue), change: revenueChange, up: revenueChange >= 0, icon: DollarSign, color: "bg-brand/10 text-brand" },
+                  { label: "Total Orders", value: String(totalOrders), change: ordersChange, up: ordersChange >= 0, icon: ShoppingCart, color: "bg-accent/10 text-accent" },
+                  { label: "Total Customers", value: String(totalCustomers), change: customersChange, up: customersChange >= 0, icon: Users, color: "bg-success/10 text-success" },
+                  { label: "Active Products", value: String(activeProducts), change: activeProductsChange, up: activeProductsChange >= 0, icon: Boxes, color: "bg-warning/10 text-warning" },
                 ].map((s) => (
                   <div key={s.label} className="rounded-2xl border bg-card p-5 shadow-soft">
                     <div className="flex items-center justify-between">
                       <div className={cn("grid h-10 w-10 place-items-center rounded-xl", s.color)}><s.icon className="h-5 w-5" /></div>
                       <span className={cn("flex items-center gap-1 text-xs font-semibold", s.up ? "text-success" : "text-destructive")}>
-                        {s.up ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />} {s.change}%
+                        {s.up ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />} {Math.abs(s.change).toFixed(1)}%
                       </span>
                     </div>
                     <p className="mt-4 text-xs font-medium text-muted-foreground uppercase">{s.label}</p>
@@ -614,12 +760,12 @@ function AdminPanel() {
               <div className="grid gap-4 lg:grid-cols-3">
                 <div className="lg:col-span-2 rounded-2xl border bg-card p-5 shadow-soft">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="font-semibold">Revenue Trend (2026)</p>
+                    <p className="font-semibold">Revenue Trend</p>
                     <Badge variant="outline">Last 7 months</Badge>
                   </div>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={revenueData}>
+                      <AreaChart data={monthlyRevenueData}>
                         <defs>
                           <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor="#2563eb" stopOpacity={0.5} />
@@ -641,8 +787,8 @@ function AdminPanel() {
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={categoryData} dataKey="value" nameKey="name" outerRadius={80} innerRadius={40} paddingAngle={2}>
-                          {categoryData.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
+                        <Pie data={pieCategoryData} dataKey="value" nameKey="name" outerRadius={80} innerRadius={40} paddingAngle={2}>
+                          {pieCategoryData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                         </Pie>
                         <Tooltip />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -685,7 +831,7 @@ function AdminPanel() {
                     <Badge variant="outline">{customerList.length} registered</Badge>
                   </div>
                   <div className="space-y-3">
-                    {customerList.slice(0, 4).map((c) => (
+                    {topCustomers.map((c) => (
                       <div key={c.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-muted/50 transition-colors">
                         <div className="grid h-10 w-10 place-items-center rounded-full gradient-brand text-white font-bold">{c.name[0]}</div>
                         <div className="flex-1 min-w-0">
@@ -723,24 +869,24 @@ function AdminPanel() {
                     <DialogTrigger asChild>
                       <Button className="gap-2 rounded-xl"><Plus className="h-4 w-4" /> Add Product</Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-lg">
+                    <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-6">
                       <DialogHeader>
                         <DialogTitle>Add New Product</DialogTitle>
                         <DialogDescription>Create a new item in Bazaar catalogue</DialogDescription>
                       </DialogHeader>
-                      <form onSubmit={handleCreateProduct} className="space-y-4 py-2">
+                      <form onSubmit={handleCreateProduct} className="flex-1 overflow-y-auto space-y-4 pr-1 py-2">
                         <div>
                           <Label>Product Title</Label>
-                          <Input required value={newProdForm.title} onChange={(e) => setNewProdForm({ ...newProdForm, title: e.target.value })} placeholder="e.g. Galaxy Z Fold 6 512GB" />
+                          <Input required value={newProdForm.title} onChange={(e) => setNewProdForm({ ...newProdForm, title: e.target.value })} />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <Label>Price (BDT ৳)</Label>
-                            <Input type="number" required value={newProdForm.price} onChange={(e) => setNewProdForm({ ...newProdForm, price: e.target.value })} placeholder="89900" />
+                            <Input type="number" required value={newProdForm.price} onChange={(e) => setNewProdForm({ ...newProdForm, price: e.target.value })} />
                           </div>
                           <div>
                             <Label>Stock Quantity</Label>
-                            <Input type="number" required value={newProdForm.stock} onChange={(e) => setNewProdForm({ ...newProdForm, stock: e.target.value })} placeholder="50" />
+                            <Input type="number" required value={newProdForm.stock} onChange={(e) => setNewProdForm({ ...newProdForm, stock: e.target.value })} />
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
@@ -757,16 +903,135 @@ function AdminPanel() {
                           </div>
                           <div>
                             <Label>Brand</Label>
-                            <Input value={newProdForm.brand} onChange={(e) => setNewProdForm({ ...newProdForm, brand: e.target.value })} placeholder="Aurora" />
+                            <Input value={newProdForm.brand} onChange={(e) => setNewProdForm({ ...newProdForm, brand: e.target.value })} />
                           </div>
                         </div>
+
+                        {/* Image Links & Warranty */}
+                        <div className="space-y-3 pt-2 border-t">
+                          <div>
+                            <Label>Main Image URL</Label>
+                            <div className="flex gap-2 items-center">
+                              <Input
+                                value={newProdForm.image}
+                                onChange={(e) => setNewProdForm({ ...newProdForm, image: e.target.value })}
+                                className="flex-1"
+                              />
+                              {newProdForm.image && (
+                                <img src={newProdForm.image} alt="Preview" className="h-9 w-9 rounded object-cover border shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                              )}
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label>Additional Gallery Images (up to {MAX_GALLERY_IMAGES})</Label>
+                            <div className="space-y-2">
+                              {newProdForm.gallery.map((url, i) => (
+                                <div key={i} className="flex gap-2 items-center">
+                                  <Input
+                                    placeholder={`Image ${i + 1} URL`}
+                                    value={url}
+                                    onChange={(e) => {
+                                      const gallery = [...newProdForm.gallery];
+                                      gallery[i] = e.target.value;
+                                      setNewProdForm({ ...newProdForm, gallery });
+                                    }}
+                                    className="flex-1"
+                                  />
+                                  {url && (
+                                    <img src={url} alt={`Preview ${i + 1}`} className="h-9 w-9 rounded object-cover border shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label>Warranty Period</Label>
+                            <Input
+                              value={newProdForm.warranty}
+                              onChange={(e) => setNewProdForm({ ...newProdForm, warranty: e.target.value })}
+                            />
+                          </div>
+                        </div>
+
                         <div>
                           <Label>Description</Label>
-                          <Textarea value={newProdForm.description} onChange={(e) => setNewProdForm({ ...newProdForm, description: e.target.value })} placeholder="Key features and specifications..." rows={3} />
+                          <Textarea value={newProdForm.description} onChange={(e) => setNewProdForm({ ...newProdForm, description: e.target.value })} rows={3} />
                         </div>
-                        <DialogFooter>
+
+                        {/* Custom Dynamic Specifications */}
+                        <div className="space-y-2 pt-2 border-t">
+                          <div className="flex items-center justify-between">
+                            <Label className="font-semibold">Dynamic Specifications</Label>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const currentSpecs = { ...newProdForm.specs };
+                                currentSpecs[`Feature ${Object.keys(currentSpecs).length + 1}`] = "";
+                                setNewProdForm({ ...newProdForm, specs: currentSpecs });
+                              }}
+                            >
+                              + Add Specification
+                            </Button>
+                          </div>
+
+                          <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                            {Object.entries(newProdForm.specs || {}).map(([k, v], idx) => (
+                              <div key={idx} className="flex gap-2 items-center">
+                                <Input
+                                  placeholder="Spec Name (e.g. Color)"
+                                  value={k}
+                                  className="flex-1 text-xs"
+                                  onChange={(e) => {
+                                    const newKey = e.target.value;
+                                    const newSpecs: Record<string, string> = {};
+                                    Object.entries(newProdForm.specs || {}).forEach(([oldK, oldV], i) => {
+                                      if (i === idx) newSpecs[newKey] = oldV;
+                                      else newSpecs[oldK] = oldV;
+                                    });
+                                    setNewProdForm({ ...newProdForm, specs: newSpecs });
+                                  }}
+                                />
+                                <Input
+                                  placeholder="Value (e.g. Midnight Blue)"
+                                  value={v}
+                                  className="flex-1 text-xs"
+                                  onChange={(e) => {
+                                    const newVal = e.target.value;
+                                    const newSpecs: Record<string, string> = {};
+                                    Object.entries(newProdForm.specs || {}).forEach(([oldK, oldV], i) => {
+                                      if (i === idx) newSpecs[oldK] = newVal;
+                                      else newSpecs[oldK] = oldV;
+                                    });
+                                    setNewProdForm({ ...newProdForm, specs: newSpecs });
+                                  }}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive h-8 w-8 p-0 shrink-0"
+                                  onClick={() => {
+                                    const newSpecs: Record<string, string> = {};
+                                    Object.entries(newProdForm.specs || {}).forEach(([oldK, oldV], i) => {
+                                      if (i !== idx) newSpecs[oldK] = oldV;
+                                    });
+                                    setNewProdForm({ ...newProdForm, specs: newSpecs });
+                                  }}
+                                >
+                                  ✕
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <DialogFooter className="sticky bottom-0 bg-background pt-3 border-t flex justify-end gap-2 z-10">
                           <Button type="button" variant="outline" onClick={() => setAddProdDialogOpen(false)}>Cancel</Button>
-                          <Button type="submit">Create Product</Button>
+                          <Button type="submit" className="bg-primary text-primary-foreground font-bold">Create Product</Button>
                         </DialogFooter>
                       </form>
                     </DialogContent>
@@ -835,13 +1100,13 @@ function AdminPanel() {
                     <DialogHeader>
                       <DialogTitle>Edit Product #{editingProduct.id}</DialogTitle>
                     </DialogHeader>
-                    
+
                     <form onSubmit={handleSaveEditProduct} className="flex-1 overflow-y-auto space-y-4 pr-1 py-2">
                       <div>
                         <Label>Title</Label>
                         <Input value={editingProduct.title} onChange={(e) => setEditingProduct({ ...editingProduct, title: e.target.value })} />
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label>Price (BDT ৳)</Label>
@@ -882,6 +1147,46 @@ function AdminPanel() {
                         </div>
                       </div>
 
+                      {/* Image Links & Gallery */}
+                      <div className="space-y-3 pt-2 border-t">
+                        <div>
+                          <Label>Main Image URL</Label>
+                          <div className="flex gap-2 items-center">
+                            <Input
+                              value={editingProduct.image}
+                              onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
+                              className="flex-1"
+                            />
+                            {editingProduct.image && (
+                              <img src={editingProduct.image} alt="Preview" className="h-9 w-9 rounded object-cover border shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label>Additional Gallery Images (up to {MAX_GALLERY_IMAGES})</Label>
+                          <div className="space-y-2">
+                            {Array.from({ length: MAX_GALLERY_IMAGES }, (_, i) => editingProduct.gallery?.[i] ?? "").map((url, i) => (
+                              <div key={i} className="flex gap-2 items-center">
+                                <Input
+                                  placeholder={`Image ${i + 1} URL`}
+                                  value={url}
+                                  onChange={(e) => {
+                                    const gallery = Array.from({ length: MAX_GALLERY_IMAGES }, (_, j) => editingProduct.gallery?.[j] ?? "");
+                                    gallery[i] = e.target.value;
+                                    setEditingProduct({ ...editingProduct, gallery });
+                                  }}
+                                  className="flex-1"
+                                />
+                                {url && (
+                                  <img src={url} alt={`Preview ${i + 1}`} className="h-9 w-9 rounded object-cover border shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label>Subcategory</Label>
@@ -889,8 +1194,8 @@ function AdminPanel() {
                         </div>
                         <div>
                           <Label>Badge</Label>
-                          <Select 
-                            value={editingProduct.badge || "none"} 
+                          <Select
+                            value={editingProduct.badge || "none"}
                             onValueChange={(val) => setEditingProduct({ ...editingProduct, badge: val === "none" ? undefined : (val as any) })}
                           >
                             <SelectTrigger><SelectValue placeholder="Select badge" /></SelectTrigger>
@@ -914,9 +1219,9 @@ function AdminPanel() {
                       <div className="space-y-2 pt-2 border-t">
                         <div className="flex items-center justify-between">
                           <Label className="font-semibold">Specifications</Label>
-                          <Button 
-                            type="button" 
-                            variant="outline" 
+                          <Button
+                            type="button"
+                            variant="outline"
                             size="sm"
                             onClick={() => {
                               const currentSpecs = typeof editingProduct.specs === 'object' && editingProduct.specs ? { ...editingProduct.specs } : {};
@@ -927,7 +1232,7 @@ function AdminPanel() {
                             + Add Specification
                           </Button>
                         </div>
-                        
+
                         <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                           {(() => {
                             const specObj = typeof editingProduct.specs === 'object' && editingProduct.specs ? editingProduct.specs : {};
@@ -939,9 +1244,9 @@ function AdminPanel() {
 
                             return specEntries.map(([k, v], idx) => (
                               <div key={idx} className="flex gap-2 items-center">
-                                <Input 
-                                  placeholder="Spec Name (e.g. Warranty)" 
-                                  value={k} 
+                                <Input
+                                  placeholder="Spec Name (e.g. Warranty)"
+                                  value={k}
                                   className="flex-1 text-xs"
                                   onChange={(e) => {
                                     const newKey = e.target.value;
@@ -953,9 +1258,9 @@ function AdminPanel() {
                                     setEditingProduct({ ...editingProduct, specs: newSpecs });
                                   }}
                                 />
-                                <Input 
-                                  placeholder="Value (e.g. 1 Year)" 
-                                  value={String(v)} 
+                                <Input
+                                  placeholder="Value (e.g. 1 Year)"
+                                  value={String(v)}
                                   className="flex-1 text-xs"
                                   onChange={(e) => {
                                     const newVal = e.target.value;
@@ -967,9 +1272,9 @@ function AdminPanel() {
                                     setEditingProduct({ ...editingProduct, specs: newSpecs });
                                   }}
                                 />
-                                <Button 
-                                  type="button" 
-                                  variant="ghost" 
+                                <Button
+                                  type="button"
+                                  variant="ghost"
                                   size="sm"
                                   className="text-destructive h-8 w-8 p-0 shrink-0"
                                   onClick={() => {
@@ -1280,14 +1585,14 @@ function AdminPanel() {
               <h1 className="text-2xl font-black">Store Analytics & Performance</h1>
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="rounded-2xl border bg-card p-6 shadow-soft space-y-2">
-                  <p className="text-xs uppercase tracking-wide font-semibold text-muted-foreground">Conversion Rate</p>
-                  <p className="text-4xl font-black">3.42% <span className="text-sm font-bold text-success">+0.4% this month</span></p>
-                  <p className="text-xs text-muted-foreground pt-1">High conversion rate driven by bKash COD integration.</p>
+                  <p className="text-xs uppercase tracking-wide font-semibold text-muted-foreground">Delivered Rate</p>
+                  <p className="text-4xl font-black">{deliveredRate.toFixed(2)}% <span className={cn("text-sm font-bold", ordersChange >= 0 ? "text-success" : "text-destructive")}>{ordersChange >= 0 ? "+" : ""}{ordersChange.toFixed(1)}% vs previous month</span></p>
+                  <p className="text-xs text-muted-foreground pt-1">Share of orders that reached delivered status.</p>
                 </div>
                 <div className="rounded-2xl border bg-card p-6 shadow-soft space-y-2">
                   <p className="text-xs uppercase tracking-wide font-semibold text-muted-foreground">Average Order Value (AOV)</p>
-                  <p className="text-4xl font-black">৳4,890 <span className="text-sm font-bold text-success">+12% vs last month</span></p>
-                  <p className="text-xs text-muted-foreground pt-1">Electronics & Smartphone bundles increasing order value.</p>
+                  <p className="text-4xl font-black">{formatBDT(Math.round(aov))} <span className={cn("text-sm font-bold", revenueChange >= 0 ? "text-success" : "text-destructive")}>{revenueChange >= 0 ? "+" : ""}{revenueChange.toFixed(1)}% vs previous month</span></p>
+                  <p className="text-xs text-muted-foreground pt-1">Calculated from live order totals and order count.</p>
                 </div>
               </div>
 
@@ -1295,7 +1600,7 @@ function AdminPanel() {
                 <p className="font-semibold">Monthly Orders Growth</p>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={revenueData}>
+                    <BarChart data={monthlyRevenueData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 90%)" />
                       <XAxis dataKey="m" />
                       <YAxis />
@@ -1387,9 +1692,56 @@ function AdminPanel() {
             </TabsContent>
 
             {/* SETTINGS TAB */}
-            <TabsContent value="settings" className="space-y-4">
-              <h1 className="text-2xl font-black">Store Configuration</h1>
+            <TabsContent value="settings" className="space-y-6">
+              <h1 className="text-2xl font-black">Store & Security Configuration</h1>
+
+              {/* Admin Credentials Form */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!adminIdInput.trim() || !adminPassInput) {
+                    toast.error("Admin ID and Password cannot be empty");
+                    return;
+                  }
+                  localStorage.setItem("bazaar_admin_id", adminIdInput.trim());
+                  localStorage.setItem("bazaar_admin_password", adminPassInput);
+                  toast.success("Admin ID and Password updated successfully! Only new credentials will work.");
+                }}
+                className="rounded-2xl border bg-card p-6 shadow-soft space-y-4 max-w-2xl"
+              >
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-brand" />
+                  <h2 className="text-lg font-bold">Admin Login Credentials</h2>
+                </div>
+                <p className="text-xs text-muted-foreground">Change your Admin ID and Password used to access this Admin Portal.</p>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Admin ID</Label>
+                    <Input
+                      value={adminIdInput}
+                      onChange={(e) => setAdminIdInput(e.target.value)}
+                      required
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label>Admin Password</Label>
+                    <Input
+                      type="text"
+                      value={adminPassInput}
+                      onChange={(e) => setAdminPassInput(e.target.value)}
+                      required
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <Button type="submit" size="lg" className="rounded-xl">Update Admin Credentials</Button>
+              </form>
+
+              {/* Store Configuration */}
               <form onSubmit={(e) => { e.preventDefault(); toast.success("Store settings updated successfully"); }} className="rounded-2xl border bg-card p-6 shadow-soft space-y-4 max-w-2xl">
+                <h2 className="text-lg font-bold">Store Details</h2>
                 <div>
                   <Label>Store Name</Label>
                   <Input value={storeSettings.storeName} onChange={(e) => setStoreSettings({ ...storeSettings, storeName: e.target.value })} className="mt-1" />
@@ -1417,6 +1769,284 @@ function AdminPanel() {
                 <Button type="submit" size="lg" className="rounded-xl">Save Store Settings</Button>
               </form>
             </TabsContent>
+
+            {/* ADVERTISEMENTS TAB */}
+            <TabsContent value="advertisements" className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h1 className="text-2xl font-black">Advertisements</h1>
+                  <p className="text-sm text-muted-foreground">{adsList.length} advertisement{adsList.length !== 1 ? "s" : ""} configured</p>
+                </div>
+                <Dialog open={addAdDialogOpen} onOpenChange={setAddAdDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2 rounded-xl"><Plus className="h-4 w-4" /> Add Advertisement</Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Add Advertisement</DialogTitle>
+                      <DialogDescription>Create a new promotional advertisement banner</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!newAdForm.title || !newAdForm.image_url) return;
+                      await addAdMut.mutateAsync(newAdForm);
+                      setAddAdDialogOpen(false);
+                      setNewAdForm({ title: "", image_url: "", link_url: "#", active: true });
+                      toast.success("Advertisement created!");
+                    }} className="space-y-4 pt-2">
+                      <div>
+                        <Label>Ad Title</Label>
+                        <Input required value={newAdForm.title} onChange={(e) => setNewAdForm({ ...newAdForm, title: e.target.value })} className="mt-1" />
+                      </div>
+                      <div>
+                        <Label>Image URL</Label>
+                        <div className="flex gap-2 items-center mt-1">
+                          <Input required value={newAdForm.image_url} onChange={(e) => setNewAdForm({ ...newAdForm, image_url: e.target.value })} className="flex-1" />
+                          {newAdForm.image_url && <img src={newAdForm.image_url} alt="preview" className="h-9 w-14 object-cover rounded border shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Target Link URL</Label>
+                        <Input value={newAdForm.link_url} onChange={(e) => setNewAdForm({ ...newAdForm, link_url: e.target.value })} className="mt-1" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => setNewAdForm({ ...newAdForm, active: !newAdForm.active })} className="text-brand">
+                          {newAdForm.active ? <ToggleRight className="h-7 w-7" /> : <ToggleLeft className="h-7 w-7 text-muted-foreground" />}
+                        </button>
+                        <Label>{newAdForm.active ? "Active (visible on site)" : "Inactive (hidden)"}</Label>
+                      </div>
+                      <DialogFooter>
+                        <Button type="submit" className="rounded-xl">Create Advertisement</Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {adsList.length === 0 ? (
+                <div className="rounded-2xl border-2 border-dashed bg-muted/20 p-16 text-center">
+                  <ImageIcon className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
+                  <p className="font-semibold text-muted-foreground">No advertisements yet</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Add your first ad banner to display promotions on the homepage</p>
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {adsList.map((ad: any) => (
+                    <div key={ad.id} className={cn("rounded-2xl border bg-card shadow-soft overflow-hidden", !ad.active && "opacity-60")}>
+                      <div className="relative">
+                        <img src={ad.image_url} alt={ad.title} className="w-full h-40 object-cover" onError={(e) => { e.currentTarget.src = `https://picsum.photos/seed/ad-${ad.id}/800/400`; }} />
+                        <div className="absolute top-2 right-2 flex gap-1">
+                          <Badge className={ad.active ? "bg-success text-white" : "bg-muted text-muted-foreground"}>{ad.active ? "Active" : "Inactive"}</Badge>
+                        </div>
+                      </div>
+                      <div className="p-4 space-y-2">
+                        <p className="font-bold">{ad.title}</p>
+                        <a href={ad.link_url} target="_blank" rel="noreferrer" className="text-xs text-brand flex items-center gap-1 hover:underline">
+                          <ExternalLink className="h-3 w-3" /> {ad.link_url}
+                        </a>
+                        <div className="flex gap-2 pt-1">
+                          <Dialog open={editingAd?.id === ad.id} onOpenChange={(o) => { if (!o) setEditingAd(null); }}>
+                            <DialogTrigger asChild>
+                              <Button size="sm" variant="outline" className="gap-1 rounded-lg" onClick={() => setEditingAd({ ...ad })}>
+                                <Edit className="h-3 w-3" /> Edit
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-lg">
+                              <DialogHeader><DialogTitle>Edit Advertisement</DialogTitle></DialogHeader>
+                              {editingAd && (
+                                <form onSubmit={async (e) => {
+                                  e.preventDefault();
+                                  await updateAdMut.mutateAsync(editingAd);
+                                  setEditingAd(null);
+                                  toast.success("Advertisement updated!");
+                                }} className="space-y-4 pt-2">
+                                  <div>
+                                    <Label>Ad Title</Label>
+                                    <Input required value={editingAd.title} onChange={(e) => setEditingAd({ ...editingAd, title: e.target.value })} className="mt-1" />
+                                  </div>
+                                  <div>
+                                    <Label>Image URL</Label>
+                                    <div className="flex gap-2 items-center mt-1">
+                                      <Input required value={editingAd.image_url} onChange={(e) => setEditingAd({ ...editingAd, image_url: e.target.value })} className="flex-1" />
+                                      {editingAd.image_url && <img src={editingAd.image_url} alt="preview" className="h-9 w-14 object-cover rounded border shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <Label>Target Link URL</Label>
+                                    <Input value={editingAd.link_url} onChange={(e) => setEditingAd({ ...editingAd, link_url: e.target.value })} className="mt-1" />
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button type="button" onClick={() => setEditingAd({ ...editingAd, active: !editingAd.active })} className="text-brand">
+                                      {editingAd.active ? <ToggleRight className="h-7 w-7" /> : <ToggleLeft className="h-7 w-7 text-muted-foreground" />}
+                                    </button>
+                                    <Label>{editingAd.active ? "Active" : "Inactive"}</Label>
+                                  </div>
+                                  <DialogFooter>
+                                    <Button type="submit" className="rounded-xl">Save Changes</Button>
+                                  </DialogFooter>
+                                </form>
+                              )}
+                            </DialogContent>
+                          </Dialog>
+                          <Button size="sm" variant="ghost" className="gap-1 rounded-lg text-destructive hover:bg-destructive/10"
+                            onClick={async () => { await deleteAdMut.mutateAsync(Number(ad.id)); toast.success("Advertisement deleted"); }}>
+                            <Trash2 className="h-3 w-3" /> Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* CAROUSEL SLIDER TAB */}
+            <TabsContent value="carousel" className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h1 className="text-2xl font-black">Carousel Slider</h1>
+                  <p className="text-sm text-muted-foreground">{slidesList.length} slide{slidesList.length !== 1 ? "s" : ""} — displayed on homepage in order</p>
+                </div>
+                <Dialog open={addSlideDialogOpen} onOpenChange={setAddSlideDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2 rounded-xl" disabled={slidesList.length >= 5}>
+                      <Plus className="h-4 w-4" /> Add Slide {slidesList.length >= 5 && "(max 5)"}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Add Carousel Slide</DialogTitle>
+                      <DialogDescription>Max 5 slides. Only active slides are shown on the homepage.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!newSlideForm.image_url) return;
+                      await addSlideMut.mutateAsync({ ...newSlideForm, position: slidesList.length });
+                      setAddSlideDialogOpen(false);
+                      setNewSlideForm({ image_url: "", caption: "", sub_caption: "", target_url: "#", position: 0, active: true });
+                      toast.success("Carousel slide added!");
+                    }} className="space-y-4 pt-2">
+                      <div>
+                        <Label>Slide Image URL</Label>
+                        <div className="flex gap-2 items-center mt-1">
+                          <Input required value={newSlideForm.image_url} onChange={(e) => setNewSlideForm({ ...newSlideForm, image_url: e.target.value })} className="flex-1" />
+                          {newSlideForm.image_url && <img src={newSlideForm.image_url} alt="preview" className="h-9 w-14 object-cover rounded border shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Heading / Caption</Label>
+                        <Input value={newSlideForm.caption} onChange={(e) => setNewSlideForm({ ...newSlideForm, caption: e.target.value })} className="mt-1" />
+                      </div>
+                      <div>
+                        <Label>Sub-caption</Label>
+                        <Input value={newSlideForm.sub_caption} onChange={(e) => setNewSlideForm({ ...newSlideForm, sub_caption: e.target.value })} className="mt-1" />
+                      </div>
+                      <div>
+                        <Label>Target URL (CTA link)</Label>
+                        <Input value={newSlideForm.target_url} onChange={(e) => setNewSlideForm({ ...newSlideForm, target_url: e.target.value })} className="mt-1" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => setNewSlideForm({ ...newSlideForm, active: !newSlideForm.active })} className="text-brand">
+                          {newSlideForm.active ? <ToggleRight className="h-7 w-7" /> : <ToggleLeft className="h-7 w-7 text-muted-foreground" />}
+                        </button>
+                        <Label>{newSlideForm.active ? "Active (visible)" : "Inactive (hidden)"}</Label>
+                      </div>
+                      <DialogFooter>
+                        <Button type="submit" className="rounded-xl">Add Slide</Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {slidesList.length === 0 ? (
+                <div className="rounded-2xl border-2 border-dashed bg-muted/20 p-16 text-center">
+                  <SlidersHorizontal className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
+                  <p className="font-semibold text-muted-foreground">No slides yet</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Add up to 5 carousel slides to display on the homepage hero section</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {slidesList.map((slide: any, idx: number) => (
+                    <div key={slide.id} className={cn("rounded-2xl border bg-card shadow-soft overflow-hidden flex gap-4 p-4", !slide.active && "opacity-60")}>
+                      <img src={slide.image_url} alt={slide.caption || "Slide"} className="w-28 h-20 object-cover rounded-xl shrink-0 border" onError={(e) => { e.currentTarget.src = `https://picsum.photos/seed/slide-${slide.id}/400/300`; }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs font-bold">#{idx + 1}</Badge>
+                          <Badge className={slide.active ? "bg-success text-white text-xs" : "bg-muted text-muted-foreground text-xs"}>{slide.active ? "Active" : "Inactive"}</Badge>
+                        </div>
+                        <p className="font-bold mt-1 truncate">{slide.caption || "(No caption)"}</p>
+                        <p className="text-xs text-muted-foreground truncate">{slide.sub_caption}</p>
+                        <a href={slide.target_url} target="_blank" rel="noreferrer" className="text-xs text-brand flex items-center gap-1 hover:underline mt-1">
+                          <ExternalLink className="h-3 w-3" /> {slide.target_url}
+                        </a>
+                      </div>
+                      <div className="flex flex-col gap-1 shrink-0">
+                        <div className="flex gap-1">
+                          <Dialog open={editingSlide?.id === slide.id} onOpenChange={(o) => { if (!o) setEditingSlide(null); }}>
+                            <DialogTrigger asChild>
+                              <Button size="sm" variant="outline" className="gap-1 rounded-lg h-8" onClick={() => setEditingSlide({ ...slide })}>
+                                <Edit className="h-3 w-3" /> Edit
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-lg">
+                              <DialogHeader><DialogTitle>Edit Slide</DialogTitle></DialogHeader>
+                              {editingSlide && (
+                                <form onSubmit={async (e) => {
+                                  e.preventDefault();
+                                  await updateSlideMut.mutateAsync(editingSlide);
+                                  setEditingSlide(null);
+                                  toast.success("Slide updated!");
+                                }} className="space-y-4 pt-2">
+                                  <div>
+                                    <Label>Slide Image URL</Label>
+                                    <div className="flex gap-2 items-center mt-1">
+                                      <Input required value={editingSlide.image_url} onChange={(e) => setEditingSlide({ ...editingSlide, image_url: e.target.value })} className="flex-1" />
+                                      {editingSlide.image_url && <img src={editingSlide.image_url} alt="preview" className="h-9 w-14 object-cover rounded border shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <Label>Heading / Caption</Label>
+                                    <Input value={editingSlide.caption || ""} onChange={(e) => setEditingSlide({ ...editingSlide, caption: e.target.value })} className="mt-1" />
+                                  </div>
+                                  <div>
+                                    <Label>Sub-caption</Label>
+                                    <Input value={editingSlide.sub_caption || ""} onChange={(e) => setEditingSlide({ ...editingSlide, sub_caption: e.target.value })} className="mt-1" />
+                                  </div>
+                                  <div>
+                                    <Label>Target URL</Label>
+                                    <Input value={editingSlide.target_url} onChange={(e) => setEditingSlide({ ...editingSlide, target_url: e.target.value })} className="mt-1" />
+                                  </div>
+                                  <div>
+                                    <Label>Position (order)</Label>
+                                    <Input type="number" min={0} max={4} value={editingSlide.position} onChange={(e) => setEditingSlide({ ...editingSlide, position: Number(e.target.value) })} className="mt-1" />
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button type="button" onClick={() => setEditingSlide({ ...editingSlide, active: !editingSlide.active })} className="text-brand">
+                                      {editingSlide.active ? <ToggleRight className="h-7 w-7" /> : <ToggleLeft className="h-7 w-7 text-muted-foreground" />}
+                                    </button>
+                                    <Label>{editingSlide.active ? "Active" : "Inactive"}</Label>
+                                  </div>
+                                  <DialogFooter>
+                                    <Button type="submit" className="rounded-xl">Save Changes</Button>
+                                  </DialogFooter>
+                                </form>
+                              )}
+                            </DialogContent>
+                          </Dialog>
+                          <Button size="sm" variant="ghost" className="gap-1 rounded-lg h-8 text-destructive hover:bg-destructive/10"
+                            onClick={async () => { await deleteSlideMut.mutateAsync(Number(slide.id)); toast.success("Slide deleted"); }}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-xs text-muted-foreground text-center pt-1">{slidesList.length}/5 slides used</p>
+                </div>
+              )}
+            </TabsContent>
+
           </div>
         </div>
       </Tabs>
