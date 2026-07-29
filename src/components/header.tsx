@@ -6,12 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { categories, products } from "@/lib/data";
+import { categories } from "@/lib/data";
 import { useShop } from "@/lib/shop-context";
 import { cn } from "@/lib/utils";
 
 export function Header() {
-  const { cartCount, wishlist } = useShop();
+  const { cartCount, wishlist, products } = useShop();
   const [q, setQ] = useState("");
   const [focus, setFocus] = useState(false);
   const [scrolled, setScrolled] = useState(false);

@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { ProductCard } from "@/components/product-card";
-import { getProduct, products, categories, formatBDT } from "@/lib/data";
+import { getProduct, categories, formatBDT } from "@/lib/data";
+import { getProductFn } from "@/lib/products-api";
 import { useShop } from "@/lib/shop-context";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -27,8 +28,9 @@ export const Route = createFileRoute("/product/$id")({
       links: [{ rel: "canonical", href: `/product/${params.id}` }],
     };
   },
-  loader: ({ params }) => {
-    const p = getProduct(params.id);
+  loader: async ({ params }) => {
+    // Try live DB first, fall back to static data for SSR pre-rendering
+    const p = await getProductFn({ data: params.id }).catch(() => null) ?? getProduct(params.id);
     if (!p) throw notFound();
     return { product: p };
   },
@@ -42,12 +44,12 @@ export const Route = createFileRoute("/product/$id")({
 });
 
 function ProductPage() {
-  const { product } = Route.useLoaderData();
-  const { addToCart, toggleWishlist, isWishlisted, markViewed } = useShop();
+  const { product } = Route.useLoaderData() as any;
+  const { addToCart, toggleWishlist, isWishlisted, markViewed, products } = useShop();
   const navigate = useNavigate();
   const [img, setImg] = useState(0);
   const [qty, setQty] = useState(1);
-  const gallery = [product.image, ...product.gallery];
+  const gallery = [product.image, ...( product.gallery ?? [])];
   const wished = isWishlisted(product.id);
   const category = categories.find((c) => c.slug === product.category);
   const related = products.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 5);

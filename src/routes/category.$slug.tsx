@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { ProductCard } from "@/components/product-card";
-import { categories, getByCategory, brands, formatBDT } from "@/lib/data";
+import { categories, brands, formatBDT } from "@/lib/data";
+import { useShop } from "@/lib/shop-context";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/category/$slug")({
@@ -39,8 +40,9 @@ export const Route = createFileRoute("/category/$slug")({
 });
 
 function CategoryPage() {
-  const { category } = Route.useLoaderData();
-  const all = useMemo(() => getByCategory(category.slug), [category.slug]);
+  const { category } = Route.useLoaderData() as any;
+  const { products } = useShop();
+  const all = useMemo(() => products.filter((p) => p.category?.toLowerCase() === category.slug.toLowerCase()), [products, category.slug]);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [selectedSubs, setSelectedSubs] = useState<string[]>([]);

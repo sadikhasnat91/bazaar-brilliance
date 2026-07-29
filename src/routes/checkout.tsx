@@ -9,6 +9,7 @@ import { useShop } from "@/lib/shop-context";
 import { formatBDT } from "@/lib/data";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { addOrderFn } from "@/lib/products-api";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({ meta: [{ title: "Checkout — Bazaar" }, { name: "description", content: "Complete your order" }, { name: "robots", content: "noindex" }] }),
@@ -23,15 +24,46 @@ function CheckoutPage() {
   const [payment, setPayment] = useState("cod");
   const [orderId, setOrderId] = useState<string>();
 
+  // Shipping Address Form State
+  const [name, setName] = useState("Rifat Hossain");
+  const [phone, setPhone] = useState("+8801700000000");
+  const [email, setEmail] = useState("rifat@example.com");
+  const [address, setAddress] = useState("House 12, Road 4, Dhanmondi");
+  const [city, setCity] = useState("Dhaka");
+  const [postcode, setPostcode] = useState("1209");
+
   const shippingCost = delivery === "express" ? 150 : cartTotal > 999 ? 0 : 60;
   const total = cartTotal + shippingCost;
 
-  const placeOrder = () => {
+  const placeOrder = async () => {
     const id = "BZ" + Math.floor(100000 + Math.random() * 900000);
-    setOrderId(id);
-    setStep(4);
-    clearCart();
-    toast.success("Order placed!");
+    const orderItems = cartProducts.map(cp => ({
+      title: cp.product.title,
+      qty: cp.qty,
+      price: cp.product.price
+    }));
+
+    const orderData = {
+      id,
+      customer: name,
+      email: email,
+      total: total,
+      status: "Pending" as const,
+      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      itemsCount: cartProducts.reduce((acc, cp) => acc + cp.qty, 0),
+      items: orderItems
+    };
+
+    try {
+      await addOrderFn({ data: orderData });
+      setOrderId(id);
+      setStep(4);
+      clearCart();
+      toast.success("Order placed successfully!");
+    } catch (error) {
+      console.error("Error placing order:", error);
+      toast.error("Failed to place order. Please try again.");
+    }
   };
 
   if (step === 4 && orderId) {
@@ -88,11 +120,12 @@ function CheckoutPage() {
             <form onSubmit={(e) => { e.preventDefault(); setStep(2); }} className="rounded-2xl border bg-card p-6 space-y-4">
               <p className="font-semibold flex items-center gap-2"><MapPin className="h-5 w-5" /> Shipping address</p>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div><Label>Full name</Label><Input required defaultValue="Rifat Hossain" /></div>
-                <div><Label>Phone</Label><Input required type="tel" defaultValue="+8801700000000" /></div>
-                <div className="sm:col-span-2"><Label>Street address</Label><Input required defaultValue="House 12, Road 4, Dhanmondi" /></div>
-                <div><Label>City</Label><Input required defaultValue="Dhaka" /></div>
-                <div><Label>Postcode</Label><Input required defaultValue="1209" /></div>
+                <div><Label>Full name</Label><Input required value={name} onChange={(e) => setName(e.target.value)} /></div>
+                <div><Label>Phone</Label><Input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+                <div className="sm:col-span-2"><Label>Email address</Label><Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+                <div className="sm:col-span-2"><Label>Street address</Label><Input required value={address} onChange={(e) => setAddress(e.target.value)} /></div>
+                <div><Label>City</Label><Input required value={city} onChange={(e) => setCity(e.target.value)} /></div>
+                <div><Label>Postcode</Label><Input required value={postcode} onChange={(e) => setPostcode(e.target.value)} /></div>
               </div>
               <div className="flex justify-end"><Button type="submit">Continue to delivery</Button></div>
             </form>

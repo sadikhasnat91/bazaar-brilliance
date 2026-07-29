@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { products, formatBDT } from "@/lib/data";
+import { formatBDT } from "@/lib/data";
 import { useShop } from "@/lib/shop-context";
 import { ProductCard } from "@/components/product-card";
 import { toast } from "sonner";
@@ -40,7 +40,7 @@ const mockNotifications = [
 
 function AccountPage() {
   const { tab } = useSearch({ from: "/account" });
-  const { wishlist } = useShop();
+  const { wishlist, products } = useShop();
 
   const nav = [
     { v: "dashboard", label: "Dashboard", icon: User },

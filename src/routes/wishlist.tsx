@@ -3,7 +3,6 @@ import { Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/product-card";
 import { useShop } from "@/lib/shop-context";
-import { products } from "@/lib/data";
 
 export const Route = createFileRoute("/wishlist")({
   head: () => ({ meta: [{ title: "Wishlist — Bazaar" }, { name: "description", content: "Your saved products" }, { name: "robots", content: "noindex" }] }),
@@ -11,7 +10,7 @@ export const Route = createFileRoute("/wishlist")({
 });
 
 function WishlistPage() {
-  const { wishlist } = useShop();
+  const { wishlist, products } = useShop();
   const items = wishlist.map((id) => products.find((p) => p.id === id)).filter(Boolean);
 
   return (

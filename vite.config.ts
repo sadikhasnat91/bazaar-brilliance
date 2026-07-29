@@ -12,4 +12,14 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    // Prevent Node-only packages from being analyzed in the client bundle
+    optimizeDeps: {
+      exclude: ["@libsql/client"],
+    },
+    ssr: {
+      external: ["@libsql/client"],
+      noExternal: [],
+    },
+  },
 });

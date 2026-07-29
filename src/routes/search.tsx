@@ -2,7 +2,7 @@ import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { Search as SearchIcon } from "lucide-react";
 import { z } from "zod";
 import { ProductCard } from "@/components/product-card";
-import { products } from "@/lib/data";
+import { useShop } from "@/lib/shop-context";
 
 const searchSchema = z.object({ q: z.string().optional().default("") });
 
@@ -14,6 +14,7 @@ export const Route = createFileRoute("/search")({
 
 function SearchPage() {
   const { q } = useSearch({ from: "/search" });
+  const { products } = useShop();
   const query = (q || "").toLowerCase();
   const results = query
     ? products.filter(

@@ -1,12 +1,15 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { products, type Product } from "./data";
+import { products as staticProducts, type Product } from "./data";
+import { getProductsFn } from "./products-api";
 
 type CartItem = { id: string; qty: number };
 type Ctx = {
   cart: CartItem[];
   wishlist: string[];
   recent: string[];
+  products: Product[];
   addToCart: (id: string, qty?: number) => void;
   removeFromCart: (id: string) => void;
   updateQty: (id: string, qty: number) => void;
@@ -34,6 +37,17 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [recent, setRecent] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
+
+  // Live products from database — initialData shows static products instantly,
+  // then live DB data replaces it as soon as the fetch completes
+  const { data: products = staticProducts } = useQuery({
+    queryKey: ["products"],
+    queryFn: () => getProductsFn(),
+    initialData: staticProducts,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0, // always refetch to show latest admin changes
+  });
 
   useEffect(() => {
     setCart(safeLoad(KEY_CART, []));
@@ -72,7 +86,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const cartTotal = cartProducts.reduce((s, { product, qty }) => s + product.price * qty, 0);
 
   return (
-    <ShopCtx.Provider value={{ cart, wishlist, recent, addToCart, removeFromCart, updateQty, clearCart, toggleWishlist, isWishlisted, markViewed, cartCount, cartTotal, cartProducts }}>
+    <ShopCtx.Provider value={{ cart, wishlist, recent, products, addToCart, removeFromCart, updateQty, clearCart, toggleWishlist, isWishlisted, markViewed, cartCount, cartTotal, cartProducts }}>
       {children}
     </ShopCtx.Provider>
   );

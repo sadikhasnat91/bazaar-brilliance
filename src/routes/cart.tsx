@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useShop } from "@/lib/shop-context";
-import { formatBDT, products } from "@/lib/data";
+import { formatBDT } from "@/lib/data";
 import { ProductCard } from "@/components/product-card";
 import { toast } from "sonner";
 
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/cart")({
 });
 
 function CartPage() {
-  const { cartProducts, cartTotal, updateQty, removeFromCart, clearCart } = useShop();
+  const { cartProducts, cartTotal, updateQty, removeFromCart, clearCart, products } = useShop();
   const [coupon, setCoupon] = useState("");
   const [discount, setDiscount] = useState(0);
   const shipping = cartTotal > 999 || cartTotal === 0 ? 0 : 60;

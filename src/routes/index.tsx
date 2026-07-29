@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, ChevronLeft, ChevronRight, Cpu, Shirt, Sofa, Sparkles, ShoppingBasket, Dumbbell, Baby, Car, Truck, Shield, Headphones, RefreshCw, Clock, Flame, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/product-card";
-import { categories, products, heroSlides, flashSale, newArrivals, featured, brandLogos, promoBanners, formatBDT } from "@/lib/data";
+import { categories, heroSlides, brandLogos, promoBanners, formatBDT } from "@/lib/data";
 import { useShop } from "@/lib/shop-context";
 import { cn } from "@/lib/utils";
 
@@ -107,8 +107,12 @@ function Section({ title, subtitle, action, children }: { title: string; subtitl
 }
 
 function Home() {
-  const { recent } = useShop();
+  const { recent, products } = useShop();
   const recentProducts = recent.map((id) => products.find((p) => p.id === id)).filter(Boolean).slice(0, 6);
+  // Derive product sections dynamically from live DB-backed products
+  const flashSale = products.filter((p) => p.badge === "flash").slice(0, 5);
+  const newArrivals = products.filter((p) => p.badge === "new").slice(0, 5);
+  const featured = products.filter((p) => p.badge === "trending" || p.badge === "bestseller").slice(0, 10);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 space-y-12">
@@ -199,7 +203,7 @@ function Home() {
             <h3 className="mt-3 text-3xl sm:text-4xl font-black">Get up to ৳2,000 off</h3>
             <p className="mt-1 text-white/80">On your first order over ৳5,000. Use code <span className="rounded bg-white/20 px-2 py-0.5 font-mono">BAZAAR2K</span></p>
           </div>
-          <Button size="lg" asChild className="rounded-full bg-accent text-accent-foreground hover:bg-accent/90"><Link to="/category/electronics">Start shopping</Link></Button>
+          <Button size="lg" asChild className="rounded-full bg-accent text-accent-foreground hover:bg-accent/90"><Link to="/category/$slug" params={{ slug: "electronics" }}>Start shopping</Link></Button>
         </div>
       </div>
 
