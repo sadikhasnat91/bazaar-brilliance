@@ -7,7 +7,7 @@ import { categories, heroSlides, brandLogos, promoBanners, formatBDT } from "@/l
 import { useShop } from "@/lib/shop-context";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { getCarouselFn, getAdsFn } from "@/lib/products-api";
+import { getCarouselFn, getAdsFn, getBrandsFn } from "@/lib/products-api";
 
 const iconMap = { Cpu, Shirt, Sofa, Sparkles, ShoppingBasket, Dumbbell, Baby, Car, Palette } as const;
 
@@ -123,10 +123,17 @@ function Home() {
   // Dynamic carousel & ads from admin panel
   const { data: dbSlides = [] } = useQuery({ queryKey: ["carousel"], queryFn: () => getCarouselFn() });
   const { data: dbAds = [] } = useQuery({ queryKey: ["ads"], queryFn: () => getAdsFn() });
+  const { data: dbBrands = [] } = useQuery({ queryKey: ["brands"], queryFn: () => getBrandsFn() });
 
   const activeSlides = dbSlides.filter((s: any) => s.active);
   const carouselSlides = activeSlides.length > 0 ? activeSlides : heroSlides;
   const activeAds = dbAds.filter((a: any) => a.active);
+  const activeBrands = dbBrands.filter((brand: any) => brand.active);
+  const brandCards = (activeBrands.length > 0 ? activeBrands : brandLogos).map((brand: any, index: number) => ({
+    id: brand.id ?? `${brand.name}-${index}`,
+    name: brand.name,
+    image_url: brand.image_url ?? brand.image,
+  }));
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 space-y-6">
@@ -273,12 +280,28 @@ function Home() {
 
       {/* Best brands */}
       <Section title="Best brands">
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-10">
-          {brandLogos.map((b) => (
-            <div key={b.name} className="grid aspect-square place-items-center rounded-xl border bg-card p-3 text-center card-lift">
-              <span className="text-xs font-semibold">{b.name}</span>
-            </div>
-          ))}
+        <div className="relative overflow-hidden">
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-background to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-background to-transparent" />
+          <div className="flex w-max gap-3 animate-marquee-reverse hover:[animation-play-state:paused]">
+            {[...brandCards, ...brandCards].map((b, i) => (
+              <div key={`${b.id}-${i}`} className="grid w-28 aspect-square place-items-center rounded-xl border bg-card p-3 text-center card-lift shrink-0">
+                {b.image_url ? (
+                  <img
+                    src={b.image_url}
+                    alt={b.name}
+                    className="h-full w-full object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                      const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                      if (fallback) fallback.classList.remove("hidden");
+                    }}
+                  />
+                ) : null}
+                <span className={cn("text-xs font-semibold", b.image_url ? "hidden" : "")}>{b.name}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </Section>
 

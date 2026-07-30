@@ -32,7 +32,11 @@ import {
   getCarouselFn,
   addCarouselSlideFn,
   updateCarouselSlideFn,
-  deleteCarouselSlideFn
+  deleteCarouselSlideFn,
+  getBrandsFn,
+  addBrandFn,
+  updateBrandFn,
+  deleteBrandFn
 } from "@/lib/products-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +47,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { formatBDT, categories, type Product } from "@/lib/data";
+import { formatBDT, categories, type BrandSpotlight, type Product } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin")({
@@ -390,6 +394,23 @@ function AdminPanel() {
     onSuccess: () => queryClient.refetchQueries({ queryKey: ["carousel"] })
   });
 
+  const { data: brandList = [] } = useQuery({
+    queryKey: ["brands"],
+    queryFn: () => getBrandsFn(),
+  });
+  const addBrandMut = useMutation({
+    mutationFn: (data: any) => addBrandFn({ data }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ["brands"] })
+  });
+  const updateBrandMut = useMutation({
+    mutationFn: (data: BrandSpotlight) => updateBrandFn({ data }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ["brands"] })
+  });
+  const deleteBrandMut = useMutation({
+    mutationFn: (id: number) => deleteBrandFn({ data: id }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ["brands"] })
+  });
+
   const [prodSearch, setProdSearch] = useState("");
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [addProdDialogOpen, setAddProdDialogOpen] = useState(false);
@@ -423,6 +444,10 @@ function AdminPanel() {
   const [addSlideDialogOpen, setAddSlideDialogOpen] = useState(false);
   const [editingSlide, setEditingSlide] = useState<any | null>(null);
   const [newSlideForm, setNewSlideForm] = useState({ image_url: "", caption: "", sub_caption: "", target_url: "#", position: 0, active: true });
+
+  const [addBrandDialogOpen, setAddBrandDialogOpen] = useState(false);
+  const [editingBrand, setEditingBrand] = useState<BrandSpotlight | null>(null);
+  const [newBrandForm, setNewBrandForm] = useState({ name: "", image_url: "", position: 0, active: true });
 
   const [adminIdInput, setAdminIdInput] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("bazaar_admin_id") || "admin" : "admin"));
   const [adminPassInput, setAdminPassInput] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("bazaar_admin_password") || "admin123" : "admin123"));
@@ -693,6 +718,7 @@ function AdminPanel() {
     { v: "messages", label: "Messages", icon: MessageSquare },
     { v: "advertisements", label: "Advertisements", icon: ImageIcon },
     { v: "carousel", label: "Carousel Slider", icon: SlidersHorizontal },
+    { v: "brands", label: "Brands", icon: ImageIcon },
     { v: "settings", label: "Settings", icon: Settings },
   ];
 
@@ -2043,6 +2069,152 @@ function AdminPanel() {
                     </div>
                   ))}
                   <p className="text-xs text-muted-foreground text-center pt-1">{slidesList.length}/5 slides used</p>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* BRANDS TAB */}
+            <TabsContent value="brands" className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h1 className="text-2xl font-black">Best Brands</h1>
+                  <p className="text-sm text-muted-foreground">{brandList.length} brand{brandList.length !== 1 ? "s" : ""} configured for the homepage</p>
+                </div>
+                <Dialog open={addBrandDialogOpen} onOpenChange={setAddBrandDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2 rounded-xl">
+                      <Plus className="h-4 w-4" /> Add Brand
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Add Brand</DialogTitle>
+                      <DialogDescription>Set brand name, logo or image link, and the homepage order.</DialogDescription>
+                    </DialogHeader>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!newBrandForm.name.trim()) return;
+                        await addBrandMut.mutateAsync({
+                          name: newBrandForm.name.trim(),
+                          image_url: newBrandForm.image_url.trim(),
+                          position: newBrandForm.position,
+                          active: newBrandForm.active,
+                        });
+                        setAddBrandDialogOpen(false);
+                        setNewBrandForm({ name: "", image_url: "", position: 0, active: true });
+                        toast.success("Brand added");
+                      }}
+                      className="space-y-4 pt-2"
+                    >
+                      <div>
+                        <Label>Brand Name</Label>
+                        <Input required value={newBrandForm.name} onChange={(e) => setNewBrandForm({ ...newBrandForm, name: e.target.value })} className="mt-1" />
+                      </div>
+                      <div>
+                        <Label>Logo / Image URL</Label>
+                        <div className="flex gap-2 items-center mt-1">
+                          <Input value={newBrandForm.image_url} onChange={(e) => setNewBrandForm({ ...newBrandForm, image_url: e.target.value })} className="flex-1" />
+                          {newBrandForm.image_url && <img src={newBrandForm.image_url} alt="preview" className="h-9 w-14 object-contain rounded border shrink-0 bg-background p-1" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>Display Order</Label>
+                          <Input type="number" min={0} value={newBrandForm.position} onChange={(e) => setNewBrandForm({ ...newBrandForm, position: Number(e.target.value) })} className="mt-1" />
+                        </div>
+                        <div className="flex items-center gap-2 pt-7">
+                          <button type="button" onClick={() => setNewBrandForm({ ...newBrandForm, active: !newBrandForm.active })} className="text-brand">
+                            {newBrandForm.active ? <ToggleRight className="h-7 w-7" /> : <ToggleLeft className="h-7 w-7 text-muted-foreground" />}
+                          </button>
+                          <Label>{newBrandForm.active ? "Active" : "Inactive"}</Label>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button type="submit" className="rounded-xl">Create Brand</Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {brandList.length === 0 ? (
+                <div className="rounded-2xl border-2 border-dashed bg-muted/20 p-16 text-center">
+                  <ImageIcon className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
+                  <p className="font-semibold text-muted-foreground">No brands yet</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Add brand logos to power the homepage best brands section</p>
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {brandList.map((brand: BrandSpotlight, idx: number) => (
+                    <div key={brand.id} className={cn("rounded-2xl border bg-card p-4 shadow-soft flex gap-4", !brand.active && "opacity-60") }>
+                      <div className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border bg-surface-muted">
+                        <img src={brand.image_url} alt={brand.name} className="h-full w-full object-contain p-3" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                        <span className="absolute text-xl font-black text-brand">{brand.name[0]}</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-bold truncate">{brand.name}</p>
+                          <Badge variant="outline" className="text-[10px]">#{idx + 1}</Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground truncate">{brand.image_url || "No image URL set"}</p>
+                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                          <Badge className={brand.active ? "bg-success text-white" : "bg-muted text-muted-foreground"}>{brand.active ? "Active" : "Inactive"}</Badge>
+                          <Badge variant="outline">Order {brand.position}</Badge>
+                        </div>
+                        <div className="mt-3 flex gap-2 flex-wrap">
+                          <Dialog open={editingBrand?.id === brand.id} onOpenChange={(open) => { if (!open) setEditingBrand(null); }}>
+                            <DialogTrigger asChild>
+                              <Button size="sm" variant="outline" className="gap-1 rounded-lg h-8" onClick={() => setEditingBrand({ ...brand })}>
+                                <Edit className="h-3 w-3" /> Edit
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-lg">
+                              <DialogHeader><DialogTitle>Edit Brand</DialogTitle></DialogHeader>
+                              {editingBrand && (
+                                <form onSubmit={async (e) => {
+                                  e.preventDefault();
+                                  await updateBrandMut.mutateAsync({ ...editingBrand, name: editingBrand.name.trim(), image_url: editingBrand.image_url.trim() });
+                                  setEditingBrand(null);
+                                  toast.success("Brand updated");
+                                }} className="space-y-4 pt-2">
+                                  <div>
+                                    <Label>Brand Name</Label>
+                                    <Input value={editingBrand.name} onChange={(e) => setEditingBrand({ ...editingBrand, name: e.target.value })} className="mt-1" />
+                                  </div>
+                                  <div>
+                                    <Label>Logo / Image URL</Label>
+                                    <div className="flex gap-2 items-center mt-1">
+                                      <Input value={editingBrand.image_url} onChange={(e) => setEditingBrand({ ...editingBrand, image_url: e.target.value })} className="flex-1" />
+                                      {editingBrand.image_url && <img src={editingBrand.image_url} alt="preview" className="h-9 w-14 object-contain rounded border shrink-0 bg-background p-1" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                      <Label>Display Order</Label>
+                                      <Input type="number" min={0} value={editingBrand.position} onChange={(e) => setEditingBrand({ ...editingBrand, position: Number(e.target.value) })} className="mt-1" />
+                                    </div>
+                                    <div className="flex items-center gap-2 pt-7">
+                                      <button type="button" onClick={() => setEditingBrand({ ...editingBrand, active: !editingBrand.active })} className="text-brand">
+                                        {editingBrand.active ? <ToggleRight className="h-7 w-7" /> : <ToggleLeft className="h-7 w-7 text-muted-foreground" />}
+                                      </button>
+                                      <Label>{editingBrand.active ? "Active" : "Inactive"}</Label>
+                                    </div>
+                                  </div>
+                                  <DialogFooter>
+                                    <Button type="submit" className="rounded-xl">Save Changes</Button>
+                                  </DialogFooter>
+                                </form>
+                              )}
+                            </DialogContent>
+                          </Dialog>
+                          <Button size="sm" variant="ghost" className="gap-1 rounded-lg h-8 text-destructive hover:bg-destructive/10" onClick={async () => { await deleteBrandMut.mutateAsync(Number(brand.id)); toast.success("Brand deleted"); }}>
+                            <Trash2 className="h-3 w-3" /> Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </TabsContent>

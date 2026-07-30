@@ -104,6 +104,17 @@ export async function initDb() {
     )
   `);
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS brands (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      image_url TEXT NOT NULL DEFAULT '',
+      position INTEGER NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+
   // Seeding products
   const result = await db.execute("SELECT COUNT(*) as count FROM products");
   const count = result.rows[0].count as number;
@@ -211,6 +222,30 @@ export async function initDb() {
       await db.execute({
         sql: "INSERT INTO messages (id, sender, email, subject, message, date, replied, replyText) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         args: [m.id, m.sender, m.email, m.subject, m.message, m.date, m.replied, m.replyText]
+      });
+    }
+  }
+
+  const brandsResult = await db.execute("SELECT COUNT(*) as count FROM brands");
+  if ((brandsResult.rows[0].count as number) === 0) {
+    console.log("Seeding database with initial brands...");
+    const initialBrands = [
+      { name: "Aurora", image_url: "https://picsum.photos/seed/brand-Aurora/240/120" },
+      { name: "Nimbus", image_url: "https://picsum.photos/seed/brand-Nimbus/240/120" },
+      { name: "SonicWave", image_url: "https://picsum.photos/seed/brand-SonicWave/240/120" },
+      { name: "PulseFit", image_url: "https://picsum.photos/seed/brand-PulseFit/240/120" },
+      { name: "Aarong", image_url: "https://picsum.photos/seed/brand-Aarong/240/120" },
+      { name: "Radhuni", image_url: "https://picsum.photos/seed/brand-Radhuni/240/120" },
+      { name: "Pran", image_url: "https://picsum.photos/seed/brand-Pran/240/120" },
+      { name: "Nestlé", image_url: "https://picsum.photos/seed/brand-Nestlé/240/120" },
+      { name: "Bosch", image_url: "https://picsum.photos/seed/brand-Bosch/240/120" },
+      { name: "Stanley", image_url: "https://picsum.photos/seed/brand-Stanley/240/120" },
+    ];
+
+    for (const [index, brand] of initialBrands.entries()) {
+      await db.execute({
+        sql: "INSERT INTO brands (name, image_url, position, active) VALUES (?, ?, ?, ?)",
+        args: [brand.name, brand.image_url, index, 1]
       });
     }
   }

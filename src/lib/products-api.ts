@@ -4,7 +4,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { db, initDb, parseProductRow } from "./db";
-import type { Product } from "./data";
+import type { BrandSpotlight, Product } from "./data";
 
 // Ensure DB is initialized when the module loads on the server
 let ready: Promise<void> | null = null;
@@ -271,5 +271,44 @@ export const deleteCarouselSlideFn = createServerFn({ method: "POST" })
   .handler(async ({ data: id }) => {
     await ensureDb();
     await db.execute({ sql: "DELETE FROM carousel_slides WHERE id = ?", args: [id] });
+    return { id };
+  });
+
+// --- Brand Spotlights Server Functions ---
+
+export const getBrandsFn = createServerFn({ method: "GET" })
+  .handler(async () => {
+    await ensureDb();
+    const res = await db.execute("SELECT * FROM brands ORDER BY position ASC, id ASC");
+    return res.rows.map((row) => ({ ...row, active: Boolean(row.active) })) as BrandSpotlight[];
+  });
+
+export const addBrandFn = createServerFn({ method: "POST" })
+  .validator((data: { name: string; image_url: string; position: number; active: boolean }) => data)
+  .handler(async ({ data }) => {
+    await ensureDb();
+    await db.execute({
+      sql: "INSERT INTO brands (name, image_url, position, active) VALUES (?, ?, ?, ?)",
+      args: [data.name, data.image_url, data.position, data.active ? 1 : 0]
+    });
+    return data;
+  });
+
+export const updateBrandFn = createServerFn({ method: "POST" })
+  .validator((data: BrandSpotlight) => data)
+  .handler(async ({ data }) => {
+    await ensureDb();
+    await db.execute({
+      sql: "UPDATE brands SET name = ?, image_url = ?, position = ?, active = ? WHERE id = ?",
+      args: [data.name, data.image_url, data.position, data.active ? 1 : 0, data.id]
+    });
+    return data;
+  });
+
+export const deleteBrandFn = createServerFn({ method: "POST" })
+  .validator((id: number) => id)
+  .handler(async ({ data: id }) => {
+    await ensureDb();
+    await db.execute({ sql: "DELETE FROM brands WHERE id = ?", args: [id] });
     return { id };
   });
