@@ -305,22 +305,6 @@ function Home() {
         </div>
       </Section>
 
-      {/* Popular shops */}
-      <Section title="Popular sellers" subtitle="Trusted stores loved across Bangladesh">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {["Aurora Official BD", "TechHub Dhaka", "HomeCraft Dhaka", "Rang Bangla Store"].map((s, i) => (
-            <div key={s} className="rounded-2xl border bg-card p-5 card-lift">
-              <div className={cn("grid h-14 w-14 place-items-center rounded-2xl text-white font-black text-lg", i % 2 ? "gradient-accent" : "gradient-brand")}>{s[0]}</div>
-              <p className="mt-3 font-semibold">{s}</p>
-              <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                <Star className="h-3 w-3 fill-warning text-warning" /> 4.8 · {Math.floor(Math.random() * 900 + 300)} products
-              </div>
-              <Button asChild size="sm" variant="outline" className="mt-3 w-full"><Link to="/seller">Visit store</Link></Button>
-            </div>
-          ))}
-        </div>
-      </Section>
-
       {/* Recently viewed */}
       {recentProducts.length > 0 && (
         <Section title="Recently viewed">

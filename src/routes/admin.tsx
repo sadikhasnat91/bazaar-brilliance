@@ -36,7 +36,11 @@ import {
   getBrandsFn,
   addBrandFn,
   updateBrandFn,
-  deleteBrandFn
+  deleteBrandFn,
+  getCategoryBannersFn,
+  addCategoryBannerFn,
+  updateCategoryBannerFn,
+  deleteCategoryBannerFn,
 } from "@/lib/products-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +51,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { formatBDT, categories, type BrandSpotlight, type Product } from "@/lib/data";
+import { formatBDT, categories, type BrandSpotlight, type CategoryBanner, type Product } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin")({
@@ -411,6 +415,23 @@ function AdminPanel() {
     onSuccess: () => queryClient.refetchQueries({ queryKey: ["brands"] })
   });
 
+  const { data: catBannerList = [] } = useQuery({
+    queryKey: ["categoryBanners"],
+    queryFn: () => getCategoryBannersFn(),
+  });
+  const addCatBannerMut = useMutation({
+    mutationFn: (data: any) => addCategoryBannerFn({ data }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ["categoryBanners"] })
+  });
+  const updateCatBannerMut = useMutation({
+    mutationFn: (data: CategoryBanner) => updateCategoryBannerFn({ data }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ["categoryBanners"] })
+  });
+  const deleteCatBannerMut = useMutation({
+    mutationFn: (id: number) => deleteCategoryBannerFn({ data: id }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ["categoryBanners"] })
+  });
+
   const [prodSearch, setProdSearch] = useState("");
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [addProdDialogOpen, setAddProdDialogOpen] = useState(false);
@@ -448,6 +469,12 @@ function AdminPanel() {
   const [addBrandDialogOpen, setAddBrandDialogOpen] = useState(false);
   const [editingBrand, setEditingBrand] = useState<BrandSpotlight | null>(null);
   const [newBrandForm, setNewBrandForm] = useState({ name: "", image_url: "", position: 0, active: true });
+
+  // Category Banners State
+  const [addCatBannerDialogOpen, setAddCatBannerDialogOpen] = useState(false);
+  const [editingCatBanner, setEditingCatBanner] = useState<CategoryBanner | null>(null);
+  const [newCatBannerForm, setNewCatBannerForm] = useState({ category_slug: "electronics", image_url: "", title: "", subtitle: "", link_url: "#", position: 0, active: true });
+  const [catBannerFilterSlug, setCatBannerFilterSlug] = useState("all");
 
   const [adminIdInput, setAdminIdInput] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("bazaar_admin_id") || "admin" : "admin"));
   const [adminPassInput, setAdminPassInput] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("bazaar_admin_password") || "admin123" : "admin123"));
@@ -719,6 +746,7 @@ function AdminPanel() {
     { v: "advertisements", label: "Advertisements", icon: ImageIcon },
     { v: "carousel", label: "Carousel Slider", icon: SlidersHorizontal },
     { v: "brands", label: "Brands", icon: ImageIcon },
+    { v: "cat-banners", label: "Category Banners", icon: SlidersHorizontal },
     { v: "settings", label: "Settings", icon: Settings },
   ];
 
@@ -2209,6 +2237,182 @@ function AdminPanel() {
                             </DialogContent>
                           </Dialog>
                           <Button size="sm" variant="ghost" className="gap-1 rounded-lg h-8 text-destructive hover:bg-destructive/10" onClick={async () => { await deleteBrandMut.mutateAsync(Number(brand.id)); toast.success("Brand deleted"); }}>
+                            <Trash2 className="h-3 w-3" /> Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* CATEGORY BANNERS TAB */}
+            <TabsContent value="cat-banners" className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h1 className="text-2xl font-black">Category Banners</h1>
+                  <p className="text-sm text-muted-foreground">Manage the hero slider shown on each category page</p>
+                </div>
+                <Dialog open={addCatBannerDialogOpen} onOpenChange={setAddCatBannerDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2 rounded-xl"><Plus className="h-4 w-4" /> Add Banner</Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Add Category Banner</DialogTitle>
+                      <DialogDescription>Add a banner slide for a category page. Multiple slides create a slider.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!newCatBannerForm.image_url.trim()) return;
+                      await addCatBannerMut.mutateAsync({ ...newCatBannerForm, image_url: newCatBannerForm.image_url.trim(), title: newCatBannerForm.title.trim(), subtitle: newCatBannerForm.subtitle.trim(), link_url: newCatBannerForm.link_url.trim() || "#" });
+                      setAddCatBannerDialogOpen(false);
+                      setNewCatBannerForm({ category_slug: "electronics", image_url: "", title: "", subtitle: "", link_url: "#", position: 0, active: true });
+                      toast.success("Banner added");
+                    }} className="space-y-4 pt-2">
+                      <div>
+                        <Label>Category</Label>
+                        <Select value={newCatBannerForm.category_slug} onValueChange={(v) => setNewCatBannerForm({ ...newCatBannerForm, category_slug: v })}>
+                          <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                          <SelectContent>{categories.map((c) => <SelectItem key={c.slug} value={c.slug}>{c.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Banner Image URL</Label>
+                        <div className="flex gap-2 items-center mt-1">
+                          <Input required value={newCatBannerForm.image_url} onChange={(e) => setNewCatBannerForm({ ...newCatBannerForm, image_url: e.target.value })} className="flex-1" placeholder="https://..." />
+                          {newCatBannerForm.image_url && <img src={newCatBannerForm.image_url} alt="preview" className="h-9 w-16 object-cover rounded border shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>Title (optional)</Label>
+                          <Input value={newCatBannerForm.title} onChange={(e) => setNewCatBannerForm({ ...newCatBannerForm, title: e.target.value })} className="mt-1" />
+                        </div>
+                        <div>
+                          <Label>Link URL</Label>
+                          <Input value={newCatBannerForm.link_url} onChange={(e) => setNewCatBannerForm({ ...newCatBannerForm, link_url: e.target.value })} className="mt-1" />
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Subtitle (optional)</Label>
+                        <Input value={newCatBannerForm.subtitle} onChange={(e) => setNewCatBannerForm({ ...newCatBannerForm, subtitle: e.target.value })} className="mt-1" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>Display Order</Label>
+                          <Input type="number" min={0} value={newCatBannerForm.position} onChange={(e) => setNewCatBannerForm({ ...newCatBannerForm, position: Number(e.target.value) })} className="mt-1" />
+                        </div>
+                        <div className="flex items-center gap-2 pt-7">
+                          <button type="button" onClick={() => setNewCatBannerForm({ ...newCatBannerForm, active: !newCatBannerForm.active })} className="text-brand">
+                            {newCatBannerForm.active ? <ToggleRight className="h-7 w-7" /> : <ToggleLeft className="h-7 w-7 text-muted-foreground" />}
+                          </button>
+                          <Label>{newCatBannerForm.active ? "Active" : "Inactive"}</Label>
+                        </div>
+                      </div>
+                      <DialogFooter><Button type="submit" className="rounded-xl">Create Banner</Button></DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {/* Filter by category */}
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => setCatBannerFilterSlug("all")} className={cn("rounded-full border px-3 py-1 text-xs font-medium", catBannerFilterSlug === "all" ? "bg-primary text-primary-foreground" : "hover:bg-muted")}>All</button>
+                {categories.map((c) => (
+                  <button key={c.slug} onClick={() => setCatBannerFilterSlug(c.slug)} className={cn("rounded-full border px-3 py-1 text-xs font-medium", catBannerFilterSlug === c.slug ? "bg-primary text-primary-foreground" : "hover:bg-muted")}>{c.name}</button>
+                ))}
+              </div>
+
+              {catBannerList.filter((b: CategoryBanner) => catBannerFilterSlug === "all" || b.category_slug === catBannerFilterSlug).length === 0 ? (
+                <div className="rounded-2xl border-2 border-dashed bg-muted/20 p-16 text-center">
+                  <SlidersHorizontal className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
+                  <p className="font-semibold text-muted-foreground">No banners yet</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Add banner slides to power the category page hero slider</p>
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {(catBannerList as CategoryBanner[]).filter((b) => catBannerFilterSlug === "all" || b.category_slug === catBannerFilterSlug).map((banner, idx) => (
+                    <div key={banner.id} className={cn("rounded-2xl border bg-card overflow-hidden shadow-soft", !banner.active && "opacity-60")}>
+                      <div className="relative h-32 bg-muted">
+                        <img src={banner.image_url} alt={banner.title || banner.category_slug} className="h-full w-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent flex items-end p-3">
+                          <div>
+                            {banner.title && <p className="text-white font-bold text-sm">{banner.title}</p>}
+                            {banner.subtitle && <p className="text-white/80 text-xs">{banner.subtitle}</p>}
+                          </div>
+                        </div>
+                        <Badge className="absolute top-2 right-2 text-[10px]">{categories.find(c => c.slug === banner.category_slug)?.name ?? banner.category_slug}</Badge>
+                      </div>
+                      <div className="p-3 flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge className={banner.active ? "bg-success text-white" : "bg-muted text-muted-foreground"}>{banner.active ? "Active" : "Inactive"}</Badge>
+                          <Badge variant="outline">#{idx + 1} · Order {banner.position}</Badge>
+                          {banner.link_url && banner.link_url !== "#" && <a href={banner.link_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary flex items-center gap-1"><ExternalLink className="h-3 w-3" /> Link</a>}
+                        </div>
+                        <div className="flex gap-2">
+                          <Dialog open={editingCatBanner?.id === banner.id} onOpenChange={(open) => { if (!open) setEditingCatBanner(null); }}>
+                            <DialogTrigger asChild>
+                              <Button size="sm" variant="outline" className="gap-1 rounded-lg h-8" onClick={() => setEditingCatBanner({ ...banner })}>
+                                <Edit className="h-3 w-3" /> Edit
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-lg">
+                              <DialogHeader><DialogTitle>Edit Category Banner</DialogTitle></DialogHeader>
+                              {editingCatBanner && (
+                                <form onSubmit={async (e) => {
+                                  e.preventDefault();
+                                  await updateCatBannerMut.mutateAsync({ ...editingCatBanner, image_url: editingCatBanner.image_url.trim(), title: editingCatBanner.title.trim(), subtitle: editingCatBanner.subtitle.trim(), link_url: editingCatBanner.link_url.trim() || "#" });
+                                  setEditingCatBanner(null);
+                                  toast.success("Banner updated");
+                                }} className="space-y-4 pt-2">
+                                  <div>
+                                    <Label>Category</Label>
+                                    <Select value={editingCatBanner.category_slug} onValueChange={(v) => setEditingCatBanner({ ...editingCatBanner, category_slug: v })}>
+                                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                                      <SelectContent>{categories.map((c) => <SelectItem key={c.slug} value={c.slug}>{c.name}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div>
+                                    <Label>Banner Image URL</Label>
+                                    <div className="flex gap-2 items-center mt-1">
+                                      <Input required value={editingCatBanner.image_url} onChange={(e) => setEditingCatBanner({ ...editingCatBanner, image_url: e.target.value })} className="flex-1" />
+                                      {editingCatBanner.image_url && <img src={editingCatBanner.image_url} alt="preview" className="h-9 w-16 object-cover rounded border shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                      <Label>Title</Label>
+                                      <Input value={editingCatBanner.title} onChange={(e) => setEditingCatBanner({ ...editingCatBanner, title: e.target.value })} className="mt-1" />
+                                    </div>
+                                    <div>
+                                      <Label>Link URL</Label>
+                                      <Input value={editingCatBanner.link_url} onChange={(e) => setEditingCatBanner({ ...editingCatBanner, link_url: e.target.value })} className="mt-1" />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <Label>Subtitle</Label>
+                                    <Input value={editingCatBanner.subtitle} onChange={(e) => setEditingCatBanner({ ...editingCatBanner, subtitle: e.target.value })} className="mt-1" />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                      <Label>Display Order</Label>
+                                      <Input type="number" min={0} value={editingCatBanner.position} onChange={(e) => setEditingCatBanner({ ...editingCatBanner, position: Number(e.target.value) })} className="mt-1" />
+                                    </div>
+                                    <div className="flex items-center gap-2 pt-7">
+                                      <button type="button" onClick={() => setEditingCatBanner({ ...editingCatBanner, active: !editingCatBanner.active })} className="text-brand">
+                                        {editingCatBanner.active ? <ToggleRight className="h-7 w-7" /> : <ToggleLeft className="h-7 w-7 text-muted-foreground" />}
+                                      </button>
+                                      <Label>{editingCatBanner.active ? "Active" : "Inactive"}</Label>
+                                    </div>
+                                  </div>
+                                  <DialogFooter><Button type="submit" className="rounded-xl">Save Changes</Button></DialogFooter>
+                                </form>
+                              )}
+                            </DialogContent>
+                          </Dialog>
+                          <Button size="sm" variant="ghost" className="gap-1 rounded-lg h-8 text-destructive hover:bg-destructive/10" onClick={async () => { await deleteCatBannerMut.mutateAsync(Number(banner.id)); toast.success("Banner deleted"); }}>
                             <Trash2 className="h-3 w-3" /> Delete
                           </Button>
                         </div>

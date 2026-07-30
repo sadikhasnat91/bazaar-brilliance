@@ -4,7 +4,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { db, initDb, parseProductRow } from "./db";
-import type { BrandSpotlight, Product } from "./data";
+import type { BrandSpotlight, CategoryBanner, Product } from "./data";
 
 // Ensure DB is initialized when the module loads on the server
 let ready: Promise<void> | null = null;
@@ -310,5 +310,55 @@ export const deleteBrandFn = createServerFn({ method: "POST" })
   .handler(async ({ data: id }) => {
     await ensureDb();
     await db.execute({ sql: "DELETE FROM brands WHERE id = ?", args: [id] });
+    return { id };
+  });
+
+// --- Category Banners Server Functions ---
+
+export const getCategoryBannersFn = createServerFn({ method: "GET" })
+  .handler(async () => {
+    await ensureDb();
+    const res = await db.execute("SELECT * FROM category_banners ORDER BY category_slug ASC, position ASC, id ASC");
+    return res.rows.map((row) => ({ ...row, active: Boolean(row.active) })) as CategoryBanner[];
+  });
+
+export const getCategoryBannersBySlugFn = createServerFn({ method: "GET" })
+  .validator((slug: string) => slug)
+  .handler(async ({ data: slug }) => {
+    await ensureDb();
+    const res = await db.execute({
+      sql: "SELECT * FROM category_banners WHERE category_slug = ? AND active = 1 ORDER BY position ASC, id ASC",
+      args: [slug],
+    });
+    return res.rows.map((row) => ({ ...row, active: Boolean(row.active) })) as CategoryBanner[];
+  });
+
+export const addCategoryBannerFn = createServerFn({ method: "POST" })
+  .validator((data: { category_slug: string; image_url: string; title: string; subtitle: string; link_url: string; position: number; active: boolean }) => data)
+  .handler(async ({ data }) => {
+    await ensureDb();
+    await db.execute({
+      sql: "INSERT INTO category_banners (category_slug, image_url, title, subtitle, link_url, position, active) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      args: [data.category_slug, data.image_url, data.title, data.subtitle, data.link_url, data.position, data.active ? 1 : 0],
+    });
+    return data;
+  });
+
+export const updateCategoryBannerFn = createServerFn({ method: "POST" })
+  .validator((data: CategoryBanner) => data)
+  .handler(async ({ data }) => {
+    await ensureDb();
+    await db.execute({
+      sql: "UPDATE category_banners SET category_slug = ?, image_url = ?, title = ?, subtitle = ?, link_url = ?, position = ?, active = ? WHERE id = ?",
+      args: [data.category_slug, data.image_url, data.title, data.subtitle, data.link_url, data.position, data.active ? 1 : 0, data.id],
+    });
+    return data;
+  });
+
+export const deleteCategoryBannerFn = createServerFn({ method: "POST" })
+  .validator((id: number) => id)
+  .handler(async ({ data: id }) => {
+    await ensureDb();
+    await db.execute({ sql: "DELETE FROM category_banners WHERE id = ?", args: [id] });
     return { id };
   });

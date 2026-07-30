@@ -41,6 +41,17 @@ export type BrandSpotlight = {
   active: boolean;
 };
 
+export type CategoryBanner = {
+  id: number;
+  category_slug: string;
+  image_url: string;
+  title: string;
+  subtitle: string;
+  link_url: string;
+  position: number;
+  active: boolean;
+};
+
 export const categories: Category[] = [
   { slug: "electronics", name: "Electronics", icon: "Cpu", banner: "https://picsum.photos/seed/cat-electronics/1600/500", description: "Latest gadgets, smartphones, laptops and accessories.", subcategories: ["Smartphones", "Laptops", "Headphones", "Cameras", "Smartwatches"] },
   { slug: "fashion", name: "Fashion", icon: "Shirt", banner: "https://picsum.photos/seed/cat-fashion/1600/500", description: "Trending styles for men, women and kids.", subcategories: ["Men", "Women", "Kids", "Shoes", "Bags"] },

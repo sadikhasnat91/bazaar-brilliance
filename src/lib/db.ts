@@ -115,6 +115,20 @@ export async function initDb() {
     )
   `);
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS category_banners (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category_slug TEXT NOT NULL,
+      image_url TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      subtitle TEXT NOT NULL DEFAULT '',
+      link_url TEXT NOT NULL DEFAULT '#',
+      position INTEGER NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+
   // Seeding products
   const result = await db.execute("SELECT COUNT(*) as count FROM products");
   const count = result.rows[0].count as number;
@@ -246,6 +260,26 @@ export async function initDb() {
       await db.execute({
         sql: "INSERT INTO brands (name, image_url, position, active) VALUES (?, ?, ?, ?)",
         args: [brand.name, brand.image_url, index, 1]
+      });
+    }
+  }
+
+  const categoryBannersResult = await db.execute("SELECT COUNT(*) as count FROM category_banners");
+  if ((categoryBannersResult.rows[0].count as number) === 0) {
+    const initialCategoryBanners = [
+      { category_slug: "electronics", image_url: "https://picsum.photos/seed/cat-electronics/1600/500", title: "Electronics", subtitle: "Latest gadgets, smartphones, laptops and accessories.", position: 0 },
+      { category_slug: "electronics", image_url: "https://picsum.photos/seed/cat-electronics-2/1600/500", title: "Top Deals", subtitle: "Up to 40% off on all electronics this season.", position: 1 },
+      { category_slug: "fashion", image_url: "https://picsum.photos/seed/cat-fashion/1600/500", title: "Fashion", subtitle: "Trending styles for men, women and kids.", position: 0 },
+      { category_slug: "fashion", image_url: "https://picsum.photos/seed/cat-fashion-2/1600/500", title: "New Arrivals", subtitle: "Fresh looks for the season.", position: 1 },
+      { category_slug: "home-living", image_url: "https://picsum.photos/seed/cat-home/1600/500", title: "Home & Living", subtitle: "Furniture, décor and everyday essentials.", position: 0 },
+      { category_slug: "grocery", image_url: "https://picsum.photos/seed/cat-grocery/1600/500", title: "Grocery", subtitle: "Daily essentials delivered fast.", position: 0 },
+      { category_slug: "beauty", image_url: "https://picsum.photos/seed/cat-beauty/1600/500", title: "Beauty & Health", subtitle: "Skincare, makeup and wellness.", position: 0 },
+      { category_slug: "sports", image_url: "https://picsum.photos/seed/cat-sports/1600/500", title: "Sports & Outdoor", subtitle: "Gear up for the win.", position: 0 },
+    ];
+    for (const banner of initialCategoryBanners) {
+      await db.execute({
+        sql: "INSERT INTO category_banners (category_slug, image_url, title, subtitle, link_url, position, active) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        args: [banner.category_slug, banner.image_url, banner.title, banner.subtitle, "#", banner.position, 1]
       });
     }
   }

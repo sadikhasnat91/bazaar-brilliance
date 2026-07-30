@@ -1,6 +1,8 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { ChevronRight, Grid3x3, LayoutList, SlidersHorizontal, Star } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
+import { ChevronRight, ChevronLeft, Grid3x3, LayoutList, SlidersHorizontal, Star } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { getCategoryBannersBySlugFn } from "@/lib/products-api";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
@@ -45,6 +47,15 @@ function CategoryPage() {
   const all = useMemo(() => products.filter((p) => p.category?.toLowerCase() === category.slug.toLowerCase()), [products, category.slug]);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+
+  // Category banner slider
+  const { data: dbBanners = [] } = useQuery({ queryKey: ["categoryBanners", category.slug], queryFn: () => getCategoryBannersBySlugFn({ data: category.slug }) });
+  const [slideIdx, setSlideIdx] = useState(0);
+  useEffect(() => {
+    if (dbBanners.length <= 1) return;
+    const t = setInterval(() => setSlideIdx((i) => (i + 1) % dbBanners.length), 5000);
+    return () => clearInterval(t);
+  }, [dbBanners.length]);
   const [selectedSubs, setSelectedSubs] = useState<string[]>([]);
   const [price, setPrice] = useState<[number, number]>([0, 200000]);
   const [minRating, setMinRating] = useState(0);
@@ -136,16 +147,48 @@ function CategoryPage() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="relative mt-4 overflow-hidden rounded-3xl">
-        <img src={category.banner} alt={category.name} className="h-40 w-full object-cover md:h-56" />
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/85 to-primary/20" />
-        <div className="absolute inset-0 flex items-center px-6 sm:px-10 text-white">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-black">{category.name}</h1>
-            <p className="mt-2 max-w-lg text-white/85">{category.description}</p>
+      {/* Category hero banner / slider */}
+      {dbBanners.length > 0 ? (
+        <div className="relative mt-4 overflow-hidden rounded-3xl">
+          {dbBanners.map((slide: any, i: number) => (
+            <div key={slide.id} className={cn("transition-opacity duration-700", i === slideIdx ? "opacity-100" : "opacity-0 absolute inset-0")}>
+              <img src={slide.image_url} alt={slide.title || category.name} className="h-40 w-full object-cover md:h-56" />
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/85 to-primary/20" />
+              <div className="absolute inset-0 flex items-center px-6 sm:px-10 text-white">
+                <div>
+                  <h1 className="text-3xl md:text-4xl font-black">{slide.title || category.name}</h1>
+                  {slide.subtitle && <p className="mt-2 max-w-lg text-white/85">{slide.subtitle}</p>}
+                  {slide.link_url && slide.link_url !== "#" && (
+                    <Button asChild size="sm" variant="secondary" className="mt-3 rounded-full"><a href={slide.link_url}>Shop now</a></Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+          {dbBanners.length > 1 && (
+            <>
+              <button onClick={() => setSlideIdx((i) => (i - 1 + dbBanners.length) % dbBanners.length)} className="absolute left-3 top-1/2 -translate-y-1/2 grid h-8 w-8 place-items-center rounded-full bg-black/40 text-white hover:bg-black/60 z-10"><ChevronLeft className="h-4 w-4" /></button>
+              <button onClick={() => setSlideIdx((i) => (i + 1) % dbBanners.length)} className="absolute right-3 top-1/2 -translate-y-1/2 grid h-8 w-8 place-items-center rounded-full bg-black/40 text-white hover:bg-black/60 z-10"><ChevronRight className="h-4 w-4" /></button>
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                {dbBanners.map((_: any, i: number) => (
+                  <button key={i} onClick={() => setSlideIdx(i)} className={cn("h-1.5 rounded-full transition-all", i === slideIdx ? "w-5 bg-white" : "w-1.5 bg-white/50")} />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="relative mt-4 overflow-hidden rounded-3xl">
+          <img src={category.banner} alt={category.name} className="h-40 w-full object-cover md:h-56" />
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/85 to-primary/20" />
+          <div className="absolute inset-0 flex items-center px-6 sm:px-10 text-white">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-black">{category.name}</h1>
+              <p className="mt-2 max-w-lg text-white/85">{category.description}</p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[260px_1fr]">
         <aside className="hidden lg:block sticky top-32 self-start rounded-2xl border bg-card p-5">
