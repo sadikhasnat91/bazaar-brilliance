@@ -41,9 +41,29 @@ export async function initDb() {
       status TEXT NOT NULL,
       date TEXT NOT NULL,
       itemsCount INTEGER NOT NULL,
-      items TEXT NOT NULL -- JSON string
+      items TEXT NOT NULL, -- JSON string
+      paymentMethod TEXT,
+      paymentStatus TEXT,
+      transactionId TEXT,
+      paidAt TEXT
     )
   `);
+
+  // Safe migration for existing tables if columns were added later
+  const columnsToAdd = [
+    { name: "paymentMethod", type: "TEXT" },
+    { name: "paymentStatus", type: "TEXT" },
+    { name: "transactionId", type: "TEXT" },
+    { name: "paidAt", type: "TEXT" }
+  ];
+
+  for (const col of columnsToAdd) {
+    try {
+      await db.execute(`ALTER TABLE orders ADD COLUMN ${col.name} ${col.type}`);
+    } catch {
+      // Column may already exist, ignore error
+    }
+  }
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS customers (
@@ -77,6 +97,13 @@ export async function initDb() {
       date TEXT NOT NULL,
       replied INTEGER NOT NULL DEFAULT 0,
       replyText TEXT
+    )
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
     )
   `);
 

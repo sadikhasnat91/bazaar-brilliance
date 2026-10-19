@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bell, Heart, Menu, Mic, Search, ShoppingCart, User, ChevronDown } from "lucide-react";
+import { Bell, Heart, Menu, Mic, Search, ShoppingCart, User, ChevronDown, Shield } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,21 @@ export function Header() {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const wrapRef = useRef<HTMLDivElement>(null);
+
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdmin = () => {
+      setIsAdmin(typeof window !== "undefined" && localStorage.getItem("bazaar_admin_authenticated") === "true");
+    };
+    checkAdmin();
+    window.addEventListener("storage", checkAdmin);
+    window.addEventListener("admin_auth_changed", checkAdmin);
+    return () => {
+      window.removeEventListener("storage", checkAdmin);
+      window.removeEventListener("admin_auth_changed", checkAdmin);
+    };
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 4);
@@ -83,9 +98,19 @@ export function Header() {
                 </Link>
               ))}
               <p className="mt-4 px-2 pb-2 text-xs font-semibold uppercase text-muted-foreground">Account</p>
-              <Link to="/account" className="rounded-lg px-3 py-2 text-sm hover:bg-muted">Dashboard</Link>
               <Link to="/wishlist" className="rounded-lg px-3 py-2 text-sm hover:bg-muted">Wishlist</Link>
               <Link to="/track" className="rounded-lg px-3 py-2 text-sm hover:bg-muted">Track order</Link>
+              {isAdmin && (
+                <>
+                  <div className="my-2 border-t pt-2" />
+                  <p className="px-2 pb-1 text-[11px] font-bold uppercase text-brand">Admin</p>
+                  <Link to="/admin" className="rounded-lg px-3 py-2 text-sm font-semibold text-brand hover:bg-brand/10 flex items-center gap-2">
+                    <Shield className="h-4 w-4" /> Admin Portal
+                  </Link>
+                  <Link to="/account" className="rounded-lg px-3 py-2 text-sm hover:bg-muted">Dashboard</Link>
+                  <Link to="/account" search={{ tab: "orders" }} className="rounded-lg px-3 py-2 text-sm hover:bg-muted">Orders</Link>
+                </>
+              )}
             </div>
           </SheetContent>
         </Sheet>
@@ -185,10 +210,35 @@ export function Header() {
               <DropdownMenuItem asChild><Link to="/login">Login</Link></DropdownMenuItem>
               <DropdownMenuItem asChild><Link to="/register">Register</Link></DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild><Link to="/account">Dashboard</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link to="/account" search={{ tab: "orders" }}>Orders</Link></DropdownMenuItem>
               <DropdownMenuItem asChild><Link to="/wishlist">Wishlist</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link to="/account" search={{ tab: "settings" }}>Settings</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link to="/track">Track Order</Link></DropdownMenuItem>
+
+              {isAdmin && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-[11px] font-bold uppercase tracking-wider text-brand">
+                    Admin Area
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem asChild>
+                    <Link to="/admin" className="flex items-center gap-2 font-bold text-brand">
+                      <Shield className="h-4 w-4" /> Admin Portal
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to="/account">Dashboard</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to="/account" search={{ tab: "orders" }}>Orders</Link></DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive font-medium cursor-pointer"
+                    onClick={() => {
+                      localStorage.removeItem("bazaar_admin_authenticated");
+                      setIsAdmin(false);
+                      window.dispatchEvent(new Event("admin_auth_changed"));
+                    }}
+                  >
+                    Sign Out Admin
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

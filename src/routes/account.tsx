@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useSearch } from "@tanstack/react-router";
 import { User, Package, Heart, MapPin, Bell, Settings as SettingsIcon, Star, LogOut, Lock } from "lucide-react";
@@ -41,6 +42,35 @@ const mockNotifications = [
 function AccountPage() {
   const { tab } = useSearch({ from: "/account" });
   const { wishlist, products } = useShop();
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setIsAdmin(typeof window !== "undefined" && localStorage.getItem("bazaar_admin_authenticated") === "true");
+  }, []);
+
+  if (isAdmin === null) return null;
+
+  if (!isAdmin) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 py-16 text-center">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-destructive/10 text-destructive mb-4">
+          <Lock className="h-8 w-8" />
+        </div>
+        <h1 className="text-2xl font-black">Admin Access Required</h1>
+        <p className="mt-2 text-sm text-muted-foreground max-w-md">
+          Dashboard and order management are restricted to administrator accounts. Random visitors cannot access this page.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Button asChild>
+            <Link to="/admin">Sign In as Admin</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to="/">Back to Marketplace</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const nav = [
     { v: "dashboard", label: "Dashboard", icon: User },

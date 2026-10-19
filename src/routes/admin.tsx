@@ -4,7 +4,8 @@ import {
   Settings, Star, TrendingUp, ArrowUp, ArrowDown, DollarSign, Boxes, ClipboardList,
   Bell, LogOut, Shield, Lock, Mail, Eye, EyeOff, KeyRound, Search, Plus, Trash2, Edit,
   FileText, CheckCircle2, AlertCircle, Send, Printer, RefreshCw, X, Image as ImageIcon,
-  SlidersHorizontal, ToggleLeft, ToggleRight, ExternalLink, GripVertical, ChevronUp, ChevronDown
+  SlidersHorizontal, ToggleLeft, ToggleRight, ExternalLink, GripVertical, ChevronUp, ChevronDown,
+  Smartphone, CreditCard
 } from "lucide-react";
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, Legend } from "recharts";
 import { useEffect, useState } from "react";
@@ -42,6 +43,7 @@ import {
   updateCategoryBannerFn,
   deleteCategoryBannerFn,
 } from "@/lib/products-api";
+import { saveGatewaySettingsFn } from "@/lib/payment-gateway-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -126,6 +128,10 @@ type Order = {
   date: string;
   itemsCount: number;
   items: Array<{ title: string; qty: number; price: number }>;
+  paymentMethod?: string;
+  paymentStatus?: string;
+  transactionId?: string;
+  paidAt?: string;
 };
 
 const initialOrders: Order[] = [
@@ -264,6 +270,27 @@ function AdminLoginGatekeeper({ onLogin }: { onLogin: () => void }) {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+          </div>
+
+          <div className="rounded-xl border border-dashed border-brand/30 bg-brand/5 p-3.5 text-xs text-muted-foreground flex items-center justify-between gap-2">
+            <div>
+              <p className="font-semibold text-foreground">Default Access Credentials:</p>
+              <p className="font-mono text-[11px] mt-0.5">ID: <span className="text-brand font-bold">admin</span> &nbsp;|&nbsp; Pass: <span className="text-brand font-bold">admin123</span></p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs h-8 rounded-lg shrink-0 border-brand/30 hover:bg-brand/10 hover:text-brand"
+              onClick={() => {
+                const storedId = localStorage.getItem("bazaar_admin_id") || "admin";
+                const storedPass = localStorage.getItem("bazaar_admin_password") || "admin123";
+                setAdminId(storedId);
+                setPassword(storedPass);
+              }}
+            >
+              Fill Demo Login
+            </Button>
           </div>
 
           <Button type="submit" size="lg" className="w-full rounded-xl font-bold" disabled={loading}>
@@ -494,11 +521,17 @@ function AdminPanel() {
   const handleLogin = () => {
     localStorage.setItem("bazaar_admin_authenticated", "true");
     setIsAuthenticated(true);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("admin_auth_changed"));
+    }
   };
 
   const handleLogout = () => {
     localStorage.removeItem("bazaar_admin_authenticated");
     setIsAuthenticated(false);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("admin_auth_changed"));
+    }
     toast("Signed out of Admin Panel");
   };
 
@@ -1444,6 +1477,7 @@ function AdminPanel() {
                       <TableHead>Customer</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Items</TableHead>
+                      <TableHead>Payment</TableHead>
                       <TableHead>Total</TableHead>
                       <TableHead>Status Action</TableHead>
                       <TableHead className="text-right">Invoice</TableHead>
@@ -1461,6 +1495,16 @@ function AdminPanel() {
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{o.date}</TableCell>
                         <TableCell>{o.itemsCount} item{o.itemsCount > 1 && "s"}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-0.5">
+                            <Badge variant="outline" className={cn("w-fit text-[10px] uppercase font-bold px-1.5 py-0", o.paymentStatus === "Paid" ? "border-emerald-500 text-emerald-600 bg-emerald-50/50" : "border-slate-300 text-slate-600")}>
+                              {o.paymentMethod || "COD"} • {o.paymentStatus || "Pending"}
+                            </Badge>
+                            {o.transactionId && (
+                              <span className="font-mono text-[10px] text-muted-foreground">{o.transactionId}</span>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="font-bold text-brand">{formatBDT(o.total)}</TableCell>
                         <TableCell>
                           <Select value={o.status} onValueChange={(val) => handleUpdateOrderStatus(o.id, val as Order["status"])}>
@@ -2421,6 +2465,146 @@ function AdminPanel() {
                   ))}
                 </div>
               )}
+            </TabsContent>
+
+            {/* SETTINGS TAB: PAYMENT GATEWAY CREDENTIALS */}
+            <TabsContent value="settings" className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-black">Payment Gateway Settings</h1>
+                <p className="text-sm text-muted-foreground">
+                  Configure live merchant API credentials for SSLCommerz, bKash, and Stripe.
+                </p>
+              </div>
+
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const data = {
+                    sslcommerzStoreId: formData.get("sslcommerzStoreId") as string,
+                    sslcommerzStorePasswd: formData.get("sslcommerzStorePasswd") as string,
+                    sslcommerzIsLive: formData.get("sslcommerzIsLive") === "on",
+                    bkashAppKey: formData.get("bkashAppKey") as string,
+                    bkashAppSecret: formData.get("bkashAppSecret") as string,
+                    bkashUsername: formData.get("bkashUsername") as string,
+                    bkashPassword: formData.get("bkashPassword") as string,
+                    stripeSecretKey: formData.get("stripeSecretKey") as string,
+                  };
+
+                  const res = await saveGatewaySettingsFn({ data });
+                  if (res.success) {
+                    toast.success("Payment Gateway Settings saved successfully!");
+                  } else {
+                    toast.error("Failed to save settings: " + res.error);
+                  }
+                }}
+                className="space-y-6"
+              >
+                {/* SSLCommerz Settings Box */}
+                <div className="rounded-2xl border bg-card p-6 space-y-4 shadow-soft">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold flex items-center gap-2">
+                        <Lock className="h-5 w-5 text-emerald-500" /> SSLCommerz Payment Gateway
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        Powers bKash, Nagad, Rocket, Visa, Mastercard, AMEX in Bangladesh
+                      </p>
+                    </div>
+                    <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-300 font-bold">
+                      Active
+                    </Badge>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <Label>SSLCommerz Store ID</Label>
+                      <Input
+                        name="sslcommerzStoreId"
+                        defaultValue="testbox"
+                        placeholder="e.g. testbox or my_store_id"
+                        className="mt-1 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <Label>SSLCommerz Store Password</Label>
+                      <Input
+                        type="password"
+                        name="sslcommerzStorePasswd"
+                        defaultValue="qwerty"
+                        placeholder="e.g. qwerty or store_password"
+                        className="mt-1 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-2">
+                    <input
+                      type="checkbox"
+                      id="sslcommerzIsLive"
+                      name="sslcommerzIsLive"
+                      className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand"
+                    />
+                    <Label htmlFor="sslcommerzIsLive" className="cursor-pointer font-semibold">
+                      Enable Live Production Mode (Default: Sandbox Mode)
+                    </Label>
+                  </div>
+                </div>
+
+                {/* bKash Direct Merchant Settings Box */}
+                <div className="rounded-2xl border bg-card p-6 space-y-4 shadow-soft">
+                  <div>
+                    <h3 className="text-lg font-bold flex items-center gap-2 text-[#E2136E]">
+                      <Smartphone className="h-5 w-5" /> bKash Direct Merchant API (Tokenized)
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Direct agreement & tokenized API for bKash Bangladesh
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <Label>bKash App Key</Label>
+                      <Input name="bkashAppKey" placeholder="Enter bKash App Key" className="mt-1 font-mono" />
+                    </div>
+                    <div>
+                      <Label>bKash App Secret</Label>
+                      <Input type="password" name="bkashAppSecret" placeholder="Enter bKash App Secret" className="mt-1 font-mono" />
+                    </div>
+                    <div>
+                      <Label>bKash Username</Label>
+                      <Input name="bkashUsername" placeholder="Merchant Username" className="mt-1" />
+                    </div>
+                    <div>
+                      <Label>bKash Password</Label>
+                      <Input type="password" name="bkashPassword" placeholder="Merchant Password" className="mt-1" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stripe Settings Box */}
+                <div className="rounded-2xl border bg-card p-6 space-y-4 shadow-soft">
+                  <div>
+                    <h3 className="text-lg font-bold flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
+                      <CreditCard className="h-5 w-5" /> Stripe Payment Gateway (Card Payments)
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      International Visa / Mastercard / AMEX credit card processing
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label>Stripe Secret Key</Label>
+                    <Input type="password" name="stripeSecretKey" placeholder="sk_test_... or sk_live_..." className="mt-1 font-mono" />
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button type="submit" className="font-bold px-8 h-11 text-base shadow-lg">
+                    Save Gateway Credentials
+                  </Button>
+                </div>
+              </form>
             </TabsContent>
 
           </div>

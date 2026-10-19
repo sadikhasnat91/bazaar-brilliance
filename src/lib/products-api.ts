@@ -81,7 +81,10 @@ export const addOrderFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await ensureDb();
     await db.execute({
-      sql: "INSERT INTO orders (id, customer, email, total, status, date, itemsCount, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      sql: `INSERT INTO orders (
+        id, customer, email, total, status, date, itemsCount, items,
+        paymentMethod, paymentStatus, transactionId, paidAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         data.id,
         data.customer,
@@ -90,7 +93,11 @@ export const addOrderFn = createServerFn({ method: "POST" })
         data.status,
         data.date,
         data.itemsCount,
-        JSON.stringify(data.items)
+        JSON.stringify(data.items),
+        data.paymentMethod || "cod",
+        data.paymentStatus || "Pending",
+        data.transactionId || null,
+        data.paidAt || null
       ]
     });
     return data;
